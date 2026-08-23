@@ -1,10 +1,10 @@
 package com.fedorizvekov.soundbrowser.service;
 
+import java.io.IOException;
+import java.nio.file.Path;
 import javax.sound.sampled.AudioFileFormat;
 import javax.sound.sampled.AudioSystem;
 import javax.sound.sampled.UnsupportedAudioFileException;
-import java.io.IOException;
-import java.nio.file.Path;
 import com.fedorizvekov.soundbrowser.model.AudioMetadata;
 
 public final class AudioAnalyzer {
