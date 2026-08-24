@@ -2,6 +2,7 @@ package com.fedorizvekov.soundbrowser;
 
 import com.fedorizvekov.soundbrowser.service.AudioAnalyzer;
 import com.fedorizvekov.soundbrowser.service.AudioPlayer;
+import com.fedorizvekov.soundbrowser.service.SoundCatalogService;
 import com.fedorizvekov.soundbrowser.service.WaveformService;
 import javafx.application.Application;
 import javafx.stage.Stage;
@@ -16,6 +17,8 @@ public final class SoundBrowser extends Application {
         var waveformService = new WaveformService();
 
         var audioPlayer = new AudioPlayer();
+
+        var catalogService = new SoundCatalogService(analyzer);
 
     }
 
