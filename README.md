@@ -17,3 +17,7 @@ A desktop application for browsing, previewing, and analyzing sound effects in a
 ## ▶️ Run
 
 ```shell
+mvn clean package
+
+java -jar target/sound-browser-1.0.0.jar
+```

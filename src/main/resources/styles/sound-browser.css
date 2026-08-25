@@ -1,0 +1,142 @@
+.sound-browser {
+    -fx-padding: 16px;
+    -fx-background-color: #eceff0;
+}
+
+.browser-header {
+    -fx-padding: 14px 16px;
+    -fx-background-color: #f5f6f6;
+    -fx-background-radius: 10px;
+    -fx-border-color: #d7dbdc;
+    -fx-border-radius: 10px;
+}
+
+.library-title {
+    -fx-font-size: 15px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #303638;
+}
+
+.directory-separator {
+    -fx-font-weight: bold;
+    -fx-text-fill: #8b9294;
+}
+
+.directory-path {
+    -fx-font-weight: bold;
+    -fx-text-fill: #596164;
+}
+
+.primary-button {
+    -fx-padding: 8px 14px;
+    -fx-background-color: #ff7a18;
+    -fx-background-radius: 7px;
+    -fx-text-fill: #3d1b00;
+    -fx-font-weight: bold;
+    -fx-cursor: hand;
+}
+
+.primary-button:hover {
+    -fx-background-color: #ed6908;
+}
+
+.primary-button:pressed {
+    -fx-background-color: #d95b00;
+}
+
+.primary-button:focused {
+    -fx-focus-color: #ffb27a;
+    -fx-faint-focus-color: rgba(255, 122, 24, 0.18);
+}
+
+.search-field {
+    -fx-padding: 8px 10px;
+    -fx-background-color: #fafafa;
+    -fx-background-radius: 7px;
+    -fx-border-color: #d1d6d7;
+    -fx-border-radius: 7px;
+}
+
+.search-field:focused {
+    -fx-border-color: #ff9b52;
+    -fx-focus-color: transparent;
+    -fx-faint-focus-color: rgba(255, 122, 24, 0.12);
+}
+
+.count-label {
+    -fx-padding: 4px 9px;
+    -fx-background-color: #fff0e5;
+    -fx-background-radius: 10px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #9c4100;
+}
+
+.sound-list {
+    -fx-background-color: #f4f5f5;
+    -fx-control-inner-background: #f4f5f5;
+    -fx-background-insets: 0;
+    -fx-background-radius: 10px;
+    -fx-border-color: #d5d9da;
+    -fx-border-radius: 10px;
+}
+
+.sound-list:focused {
+    -fx-background-insets: 0;
+    -fx-focus-color: #ffb27a;
+    -fx-faint-focus-color: rgba(255, 122, 24, 0.12);
+}
+
+.sound-list .list-cell {
+    -fx-background-color: #f6f7f7;
+    -fx-border-color: transparent transparent #dfe3e3 transparent;
+}
+
+.sound-list .list-cell:filled:hover {
+    -fx-background-color: #fff4eb;
+}
+
+.sound-list .list-cell:filled:selected {
+    -fx-background-color: #ffe3cf;
+}
+
+.sound-list .list-cell:filled:selected:hover {
+    -fx-background-color: #ffdbc0;
+}
+
+.sound-cell-content {
+    -fx-padding: 9px 12px;
+}
+
+.sound-name {
+    -fx-font-weight: bold;
+    -fx-text-fill: #303638;
+}
+
+.sound-path,
+.sound-metadata {
+    -fx-text-fill: #667073;
+}
+
+.sound-list .list-cell:filled:selected .sound-name {
+    -fx-text-fill: #4a2000;
+}
+
+.sound-list .list-cell:filled:selected .sound-path,
+.sound-list .list-cell:filled:selected .sound-metadata {
+    -fx-text-fill: #70401c;
+}
+
+.status-label {
+    -fx-font-weight: bold;
+    -fx-text-fill: #596164;
+}
+
+.status-warning {
+    -fx-font-weight: bold;
+    -fx-text-fill: #a44600;
+}
+
+.status-error {
+    -fx-font-weight: bold;
+    -fx-text-fill: #b42318;
+}
