@@ -3,7 +3,12 @@ package com.fedorizvekov.soundbrowser.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -34,6 +39,77 @@ class AudioPlayerTest {
     @Mock(answer = Answers.CALLS_REAL_METHODS)
     private MockedStatic<AudioSystem> audioSystem;
 
+    private Path file = AUDIO_DIR.resolve("test_signal_16bit.wav");
+
+
+    @Test
+    @DisplayName("should call play when toggled file is not current")
+    void shouldCallPlayWhenToggledFileIsNotCurrent() throws Exception {
+
+        var audioPlayer = spy(new AudioPlayer());
+
+        doNothing().when(audioPlayer).play(file);
+
+        audioPlayer.toggle(file);
+
+        assertAll(
+                () -> verify(audioPlayer).play(file),
+                () -> verify(audioPlayer, never()).isPlaying(),
+                () -> verify(audioPlayer, never()).pause(),
+                () -> verify(audioPlayer, never()).resume()
+        );
+    }
+
+
+    @Test
+    @DisplayName("should call pause when current audio is playing")
+    void shouldCallPauseWhenCurrentAudioIsPlaying() throws Exception {
+
+        audioSystem.when(AudioSystem::getClip).thenReturn(clip);
+
+        var audioPlayer = spy(new AudioPlayer());
+
+        audioPlayer.play(file);
+
+        clearInvocations(audioPlayer);
+        doReturn(true).when(audioPlayer).isPlaying();
+        doNothing().when(audioPlayer).pause();
+
+        audioPlayer.toggle(file);
+
+        assertAll(
+                () -> verify(audioPlayer).isPlaying(),
+                () -> verify(audioPlayer).pause(),
+                () -> verify(audioPlayer, never()).play(any(Path.class)),
+                () -> verify(audioPlayer, never()).resume()
+        );
+    }
+
+
+    @Test
+    @DisplayName("should call resume when current audio is not playing")
+    void shouldCallResumeWhenCurrentAudioIsNotPlaying() throws Exception {
+
+        audioSystem.when(AudioSystem::getClip).thenReturn(clip);
+
+        var audioPlayer = spy(new AudioPlayer());
+
+        audioPlayer.play(file);
+
+        clearInvocations(audioPlayer);
+        doReturn(false).when(audioPlayer).isPlaying();
+        doNothing().when(audioPlayer).resume();
+
+        audioPlayer.toggle(file);
+
+        assertAll(
+                () -> verify(audioPlayer).isPlaying(),
+                () -> verify(audioPlayer).resume(),
+                () -> verify(audioPlayer, never()).play(any(Path.class)),
+                () -> verify(audioPlayer, never()).pause()
+        );
+    }
+
 
     @ParameterizedTest(name = "[{index}] {0}")
     @DisplayName("should play WAV file")
@@ -63,7 +139,6 @@ class AudioPlayerTest {
     @Test
     @DisplayName("should pause current audio")
     void shouldPauseCurrentAudio() throws Exception {
-        var file = AUDIO_DIR.resolve("test_signal_16bit.wav");
 
         audioSystem.when(AudioSystem::getClip).thenReturn(clip);
         when(clip.isRunning()).thenReturn(true);
@@ -80,7 +155,6 @@ class AudioPlayerTest {
     @Test
     @DisplayName("should resume current audio")
     void shouldResumeCurrentAudio() throws Exception {
-        var file = AUDIO_DIR.resolve("test_signal_16bit.wav");
 
         audioSystem.when(AudioSystem::getClip).thenReturn(clip);
 
@@ -102,7 +176,6 @@ class AudioPlayerTest {
     @Test
     @DisplayName("should restart finished audio")
     void shouldRestartFinishedAudio() throws Exception {
-        var file = AUDIO_DIR.resolve("test_signal_16bit.wav");
 
         audioSystem.when(AudioSystem::getClip).thenReturn(clip);
 
@@ -127,7 +200,6 @@ class AudioPlayerTest {
     @Test
     @DisplayName("should stop current audio")
     void shouldStopCurrentAudio() throws Exception {
-        var file = AUDIO_DIR.resolve("test_signal_16bit.wav");
 
         audioSystem.when(AudioSystem::getClip).thenReturn(clip);
         when(clip.isOpen()).thenReturn(true);
@@ -178,7 +250,6 @@ class AudioPlayerTest {
     @Test
     @DisplayName("should return playback position and duration in seconds")
     void shouldReturnPlaybackPositionAndDurationInSeconds() throws Exception {
-        var file = AUDIO_DIR.resolve("test_signal_16bit.wav");
 
         audioSystem.when(AudioSystem::getClip).thenReturn(clip);
 

@@ -1,0 +1,30 @@
+.play-button {
+    -fx-min-width: 38px;
+    -fx-pref-width: 38px;
+    -fx-max-width: 38px;
+
+    -fx-min-height: 38px;
+    -fx-pref-height: 38px;
+    -fx-max-height: 38px;
+
+    -fx-padding: 0;
+    -fx-background-color: #fff0e5;
+    -fx-background-radius: 19px;
+    -fx-border-color: #ffb27a;
+    -fx-border-radius: 19px;
+    -fx-text-fill: #9c4100;
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-cursor: hand;
+}
+
+.play-button:hover {
+    -fx-background-color: #ffe3cf;
+    -fx-border-color: #ff7a18;
+}
+
+.play-button:playing {
+    -fx-background-color: #ff7a18;
+    -fx-border-color: #ff7a18;
+    -fx-text-fill: #3d1b00;
+}

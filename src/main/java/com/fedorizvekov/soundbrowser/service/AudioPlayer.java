@@ -13,6 +13,21 @@ public final class AudioPlayer implements AutoCloseable {
     private Path currentFile;
 
 
+    public void toggle(Path file) throws IOException, UnsupportedAudioFileException, LineUnavailableException {
+
+        if (!file.equals(currentFile)) {
+            play(file);
+            return;
+        }
+
+        if (isPlaying()) {
+            pause();
+        } else {
+            resume();
+        }
+    }
+
+
     public void play(Path file) throws IOException, UnsupportedAudioFileException, LineUnavailableException {
 
         stop();

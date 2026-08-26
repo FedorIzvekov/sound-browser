@@ -2,8 +2,10 @@ package com.fedorizvekov.soundbrowser.ui;
 
 import java.nio.file.Path;
 import java.util.Locale;
+import java.util.Objects;
 import com.fedorizvekov.soundbrowser.model.CatalogResult;
 import com.fedorizvekov.soundbrowser.model.SoundEntry;
+import com.fedorizvekov.soundbrowser.service.AudioPlayer;
 import com.fedorizvekov.soundbrowser.service.SoundCatalogService;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
@@ -31,6 +33,7 @@ public final class SoundBrowserView extends BorderPane {
     private static final String STATUS_ERROR_STYLE = "status-error";
 
     private final SoundCatalogService soundCatalogService;
+    private final AudioPlayer audioPlayer;
 
     private final Label directoryLabel = new Label("No directory selected");
     private final Label countLabel = new Label("0 total");
@@ -45,15 +48,17 @@ public final class SoundBrowserView extends BorderPane {
     private final FilteredList<SoundEntry> filteredSounds = new FilteredList<>(sounds);
 
 
-    public SoundBrowserView(SoundCatalogService soundCatalogService) {
-
-        this.soundCatalogService = soundCatalogService;
+    public SoundBrowserView(
+            SoundCatalogService soundCatalogService,
+            AudioPlayer audioPlayer
+    ) {
+        this.soundCatalogService = Objects.requireNonNull(soundCatalogService);
+        this.audioPlayer = Objects.requireNonNull(audioPlayer);
 
         configureView();
         configureActions();
         updateCountLabel();
     }
-
 
     private void configureView() {
         getStyleClass().add("sound-browser");
@@ -133,7 +138,7 @@ public final class SoundBrowserView extends BorderPane {
     private void configureSoundList() {
         soundList.setItems(filteredSounds);
         soundList.setPlaceholder(new Label("Select a directory containing WAV files"));
-        soundList.setCellFactory(list -> new SoundListCell());
+        soundList.setCellFactory(list -> new SoundListCell(audioPlayer));
         soundList.getStyleClass().add("sound-list");
     }
 
@@ -220,6 +225,7 @@ public final class SoundBrowserView extends BorderPane {
             }
 
             return normalize(entry.filename()).contains(normalizedQuery) || normalize(entry.relativePath().toString()).contains(normalizedQuery);
+
         });
     }
 
@@ -245,9 +251,9 @@ public final class SoundBrowserView extends BorderPane {
 
 
     private String normalize(String value) {
-        return value == null
-                ? ""
-                : value.strip().toLowerCase(Locale.ROOT);
+
+        return value == null ? "" : value.strip().toLowerCase(Locale.ROOT);
+
     }
 
 
