@@ -5,6 +5,7 @@ import static java.util.Objects.requireNonNull;
 import com.fedorizvekov.soundbrowser.service.AudioAnalyzer;
 import com.fedorizvekov.soundbrowser.service.AudioPlayer;
 import com.fedorizvekov.soundbrowser.service.SoundCatalogService;
+import com.fedorizvekov.soundbrowser.service.WaveformService;
 import javafx.application.Application;
 import javafx.scene.Scene;
 import javafx.stage.Stage;
@@ -23,13 +24,15 @@ public final class SoundBrowserApplication extends Application {
         var analyzer = new AudioAnalyzer();
         var catalogService = new SoundCatalogService(analyzer);
         var audioPlayer = new AudioPlayer();
+        var waveformService = new WaveformService();
 
-        var view = new SoundBrowserView(catalogService, audioPlayer);
+        var view = new SoundBrowserView(catalogService, audioPlayer, waveformService);
 
         var scene = new Scene(view, INITIAL_WIDTH, INITIAL_HEIGHT);
 
         scene.getStylesheets().add(requireNonNull(SoundBrowserApplication.class.getResource("/styles/sound-browser.css")).toExternalForm());
         scene.getStylesheets().add(requireNonNull(SoundBrowserApplication.class.getResource("/styles/player.css")).toExternalForm());
+        scene.getStylesheets().add(requireNonNull(SoundBrowserApplication.class.getResource("/styles/waveform.css")).toExternalForm());
 
         stage.setScene(scene);
         stage.setTitle("SFX Browser");

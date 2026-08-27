@@ -7,6 +7,7 @@ import com.fedorizvekov.soundbrowser.model.CatalogResult;
 import com.fedorizvekov.soundbrowser.model.SoundEntry;
 import com.fedorizvekov.soundbrowser.service.AudioPlayer;
 import com.fedorizvekov.soundbrowser.service.SoundCatalogService;
+import com.fedorizvekov.soundbrowser.service.WaveformService;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ListChangeListener;
@@ -34,6 +35,7 @@ public final class SoundBrowserView extends BorderPane {
 
     private final SoundCatalogService soundCatalogService;
     private final AudioPlayer audioPlayer;
+    private final WaveformService waveformService;
 
     private final Label directoryLabel = new Label("No directory selected");
     private final Label countLabel = new Label("0 total");
@@ -50,10 +52,12 @@ public final class SoundBrowserView extends BorderPane {
 
     public SoundBrowserView(
             SoundCatalogService soundCatalogService,
-            AudioPlayer audioPlayer
+            AudioPlayer audioPlayer,
+            WaveformService waveformService
     ) {
         this.soundCatalogService = Objects.requireNonNull(soundCatalogService);
         this.audioPlayer = Objects.requireNonNull(audioPlayer);
+        this.waveformService = Objects.requireNonNull(waveformService);
 
         configureView();
         configureActions();
@@ -138,7 +142,7 @@ public final class SoundBrowserView extends BorderPane {
     private void configureSoundList() {
         soundList.setItems(filteredSounds);
         soundList.setPlaceholder(new Label("Select a directory containing WAV files"));
-        soundList.setCellFactory(list -> new SoundListCell(audioPlayer));
+        soundList.setCellFactory(list -> new SoundListCell(audioPlayer, waveformService));
         soundList.getStyleClass().add("sound-list");
     }
 

@@ -1,10 +1,13 @@
 package com.fedorizvekov.soundbrowser.ui;
 
 import java.io.IOException;
+import java.nio.file.Path;
 import javax.sound.sampled.LineUnavailableException;
 import javax.sound.sampled.UnsupportedAudioFileException;
 import com.fedorizvekov.soundbrowser.model.SoundEntry;
 import com.fedorizvekov.soundbrowser.service.AudioPlayer;
+import com.fedorizvekov.soundbrowser.service.WaveformService;
+import javafx.application.Platform;
 import javafx.beans.binding.Bindings;
 import javafx.css.PseudoClass;
 import javafx.geometry.Pos;
@@ -22,6 +25,7 @@ final class SoundListCell extends ListCell<SoundEntry> {
     private static final PseudoClass PLAYING_PSEUDO_CLASS = PseudoClass.getPseudoClass("playing");
 
     private final AudioPlayer audioPlayer;
+    private final WaveformService waveformService;
 
     private final Button playButton = new Button("▶");
     private final Label filenameLabel = new Label();
@@ -30,19 +34,23 @@ final class SoundListCell extends ListCell<SoundEntry> {
 
     private final Tooltip pathTooltip = new Tooltip();
     private final VBox soundInfo = new VBox(4);
+    private final WaveformView waveformView = new WaveformView();
     private final HBox content = new HBox(12);
 
+    private Path waveformFile;
 
-    SoundListCell(AudioPlayer audioPlayer) {
+
+    SoundListCell(AudioPlayer audioPlayer, WaveformService waveformService) {
 
         this.audioPlayer = audioPlayer;
+        this.waveformService = waveformService;
 
         configurePlayButton();
         configureSoundInfo();
 
         content.getStyleClass().add("sound-cell-content");
         content.setAlignment(Pos.CENTER_LEFT);
-        content.getChildren().addAll(playButton, soundInfo);
+        content.getChildren().addAll(playButton, soundInfo, waveformView);
 
         HBox.setHgrow(soundInfo, Priority.ALWAYS);
 
@@ -78,6 +86,7 @@ final class SoundListCell extends ListCell<SoundEntry> {
         setGraphic(content);
 
         updatePlaybackState();
+        updateWaveform(entry);
     }
 
 
@@ -157,6 +166,41 @@ final class SoundListCell extends ListCell<SoundEntry> {
     }
 
 
+    private void updateWaveform(SoundEntry entry) {
+
+        var file = entry.path();
+
+        if (file.equals(waveformFile)) {
+            return;
+        }
+
+        waveformFile = file;
+        waveformView.setWaveform(null);
+
+        Thread.ofVirtual().name("waveform-loader").start(() -> loadWaveform(file));
+    }
+
+
+    private void loadWaveform(Path file) {
+
+        var waveform = waveformService.analyze(file).orElse(null);
+
+        Platform.runLater(() -> {
+
+            var currentEntry = getItem();
+
+            if (isEmpty()
+                    || currentEntry == null
+                    || !file.equals(waveformFile)
+                    || !file.equals(currentEntry.path())) {
+                return;
+            }
+
+            waveformView.setWaveform(waveform);
+        });
+    }
+
+
     private void showPlaybackError(Exception exception) {
 
         var message = exception.getMessage() == null
@@ -181,6 +225,9 @@ final class SoundListCell extends ListCell<SoundEntry> {
         pathLabel.setText("");
         pathTooltip.setText("");
         metadataLabel.setText("");
+
+        waveformFile = null;
+        waveformView.setWaveform(null);
 
         resetPlayButton();
 

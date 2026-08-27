@@ -1,0 +1,12 @@
+.waveform-view {
+    -fx-padding: 6px;
+    -fx-background-color: #eceeed;
+    -fx-background-radius: 6px;
+    -fx-border-color: #d5d9da;
+    -fx-border-radius: 6px;
+}
+
+.sound-list .list-cell:filled:selected .waveform-view {
+    -fx-background-color: #fff0e5;
+    -fx-border-color: #ffb27a;
+}

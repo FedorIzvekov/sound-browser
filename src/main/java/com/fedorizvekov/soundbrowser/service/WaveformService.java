@@ -11,7 +11,7 @@ import com.fedorizvekov.soundbrowser.model.Waveform;
 
 public final class WaveformService {
 
-    private static final int DEFAULT_POINTS = 1000;
+    private static final int DEFAULT_POINTS = 500;
     private static final int BUFFER_SIZE = 8192;
 
     private final int points;
