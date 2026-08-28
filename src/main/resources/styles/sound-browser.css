@@ -63,12 +63,36 @@
     -fx-faint-focus-color: rgba(255, 122, 24, 0.12);
 }
 
-.count-label {
+.found-count-label {
+    -fx-padding: 4px 9px;
+    -fx-background-color: #e6f4ea;
+    -fx-background-radius: 10px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #237a3b;
+}
+
+.total-count-label {
     -fx-padding: 4px 9px;
     -fx-background-color: #fff0e5;
     -fx-background-radius: 10px;
     -fx-font-weight: bold;
     -fx-text-fill: #9c4100;
+}
+
+.ogg-count-label {
+    -fx-padding: 4px 9px;
+    -fx-background-color: #fde8e6;
+    -fx-background-radius: 10px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #b42318;
+}
+
+.error-count-label {
+    -fx-padding: 4px 9px;
+    -fx-background-color: #fde8e6;
+    -fx-background-radius: 10px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #b42318;
 }
 
 .sound-list {

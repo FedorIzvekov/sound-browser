@@ -26,25 +26,52 @@ public final class SoundCatalogService {
     public CatalogResult load(Path directory) throws IOException {
 
         var root = validateDirectory(directory);
-        var wavFiles = findWavFiles(root);
+        var audioFiles = findAudioFiles(root);
 
-        var entries = new ArrayList<SoundEntry>(wavFiles.size());
+        var entries = new ArrayList<SoundEntry>(audioFiles.size());
         var errors = new ArrayList<CatalogError>();
+        var oggFiles = new ArrayList<Path>();
 
-        for (var file : wavFiles) {
+        for (var file : audioFiles) {
+
+            if (isOgg(file)) {
+                oggFiles.add(file);
+                continue;
+            }
 
             try {
 
-                var metadata = audioAnalyzer.analyze(file);
+                entries.add(createEntry(root, file));
 
-                entries.add(new SoundEntry(file, root.relativize(file), file.getFileName().toString(), Files.size(file), metadata));
+            } catch (UnsupportedAudioFileException exception) {
 
-            } catch (IOException | UnsupportedAudioFileException exception) {
-                errors.add(new CatalogError(file, exception.getMessage()));
+                errors.add(createError(file, CatalogError.Type.UNSUPPORTED_AUDIO, exception));
+
+            } catch (IOException exception) {
+
+                errors.add(createError(file, CatalogError.Type.FILE_UNREADABLE, exception));
+
             }
         }
 
-        return new CatalogResult(List.copyOf(entries), List.copyOf(errors));
+        return new CatalogResult(List.copyOf(entries), List.copyOf(errors), List.copyOf(oggFiles));
+    }
+
+
+    private SoundEntry createEntry(Path root, Path file) throws IOException, UnsupportedAudioFileException {
+        var metadata = audioAnalyzer.analyze(file);
+        return new SoundEntry(
+                file,
+                root.relativize(file),
+                file.getFileName().toString(),
+                Files.size(file),
+                metadata
+        );
+    }
+
+
+    private CatalogError createError(Path file, CatalogError.Type type, Exception exception) {
+        return new CatalogError(file, type, formatErrorMessage(exception));
     }
 
 
@@ -66,12 +93,12 @@ public final class SoundCatalogService {
     }
 
 
-    private List<Path> findWavFiles(Path root) throws IOException {
+    private List<Path> findAudioFiles(Path root) throws IOException {
 
         try (Stream<Path> stream = Files.walk(root)) {
             return stream
                     .filter(Files::isRegularFile)
-                    .filter(this::isWav)
+                    .filter(path -> isWav(path) || isOgg(path))
                     .sorted()
                     .toList();
         }
@@ -79,8 +106,22 @@ public final class SoundCatalogService {
 
 
     private boolean isWav(Path path) {
-        var filename = path.getFileName().toString().toLowerCase(Locale.ROOT);
-        return filename.endsWith(".wav");
+        return filename(path).endsWith(".wav");
+    }
+
+
+    private boolean isOgg(Path path) {
+        return filename(path).endsWith(".ogg");
+    }
+
+
+    private String filename(Path path) {
+        return path.getFileName().toString().toLowerCase(Locale.ROOT);
+    }
+
+
+    private String formatErrorMessage(Exception exception) {
+        return exception.getMessage() == null ? exception.getClass().getSimpleName() : exception.getMessage();
     }
 
 }
