@@ -23,8 +23,19 @@
     -fx-border-color: #ff7a18;
 }
 
+.play-button:focused {
+    -fx-border-color: #ff7a18;
+    -fx-focus-color: transparent;
+    -fx-faint-focus-color: transparent;
+}
+
 .play-button:playing {
     -fx-background-color: #ff7a18;
     -fx-border-color: #ff7a18;
     -fx-text-fill: #3d1b00;
+}
+
+.play-button:disabled {
+    -fx-opacity: 0.5;
+    -fx-cursor: default;
 }

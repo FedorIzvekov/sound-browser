@@ -26,15 +26,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @DisplayName("SoundCatalogService")
 class SoundCatalogServiceTest {
 
-    @TempDir
-    Path tempDir;
-
-    @Mock
-    private AudioAnalyzer audioAnalyzer;
-
-    @InjectMocks
-    private SoundCatalogService service;
-
     private final AudioMetadata metadata = new AudioMetadata(
             0.3,
             44_100.0f,
@@ -46,6 +37,15 @@ class SoundCatalogServiceTest {
             13_230,
             "WAVE"
     );
+
+    @TempDir
+    Path tempDir;
+
+    @Mock
+    private AudioAnalyzer audioAnalyzer;
+
+    @InjectMocks
+    private SoundCatalogService service;
 
 
     @Test

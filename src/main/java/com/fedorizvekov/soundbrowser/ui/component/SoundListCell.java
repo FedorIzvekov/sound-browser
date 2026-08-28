@@ -1,4 +1,4 @@
-package com.fedorizvekov.soundbrowser.ui;
+package com.fedorizvekov.soundbrowser.ui.component;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -20,7 +20,7 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 
-final class SoundListCell extends ListCell<SoundEntry> {
+public final class SoundListCell extends ListCell<SoundEntry> {
 
     private static final PseudoClass PLAYING_PSEUDO_CLASS = PseudoClass.getPseudoClass("playing");
 
@@ -40,7 +40,7 @@ final class SoundListCell extends ListCell<SoundEntry> {
     private Path waveformFile;
 
 
-    SoundListCell(AudioPlayer audioPlayer, WaveformService waveformService) {
+    public SoundListCell(AudioPlayer audioPlayer, WaveformService waveformService) {
 
         this.audioPlayer = audioPlayer;
         this.waveformService = waveformService;
@@ -55,10 +55,7 @@ final class SoundListCell extends ListCell<SoundEntry> {
         HBox.setHgrow(soundInfo, Priority.ALWAYS);
 
         content.prefWidthProperty().bind(
-                Bindings.createDoubleBinding(
-                        () -> Math.max(0.0, getWidth() - 28.0),
-                        widthProperty()
-                )
+                Bindings.createDoubleBinding(() -> Math.max(0.0, getWidth() - 28.0), widthProperty())
         );
     }
 
@@ -107,6 +104,7 @@ final class SoundListCell extends ListCell<SoundEntry> {
             getListView().getSelectionModel().select(entry);
 
             try {
+
                 audioPlayer.toggle(entry.path());
                 playButton.setTooltip(null);
 
@@ -139,11 +137,7 @@ final class SoundListCell extends ListCell<SoundEntry> {
         metadataLabel.setTextOverrun(OverrunStyle.ELLIPSIS);
         metadataLabel.setMaxWidth(Double.MAX_VALUE);
 
-        soundInfo.getChildren().addAll(
-                filenameLabel,
-                pathLabel,
-                metadataLabel
-        );
+        soundInfo.getChildren().addAll(filenameLabel, pathLabel, metadataLabel);
     }
 
 
@@ -297,4 +291,5 @@ final class SoundListCell extends ListCell<SoundEntry> {
 
         return "%.1f GB".formatted(megabytes / 1_024.0);
     }
+
 }

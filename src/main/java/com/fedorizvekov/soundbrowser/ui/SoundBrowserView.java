@@ -1,200 +1,86 @@
 package com.fedorizvekov.soundbrowser.ui;
 
+import java.io.IOException;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Locale;
 import com.fedorizvekov.soundbrowser.model.CatalogResult;
 import com.fedorizvekov.soundbrowser.model.SoundEntry;
+import com.fedorizvekov.soundbrowser.model.export.JsonlExportResult;
 import com.fedorizvekov.soundbrowser.service.AudioPlayer;
 import com.fedorizvekov.soundbrowser.service.SoundCatalogService;
 import com.fedorizvekov.soundbrowser.service.WaveformService;
+import com.fedorizvekov.soundbrowser.service.export.JsonlExportService;
+import com.fedorizvekov.soundbrowser.ui.component.BrowserHeader;
+import com.fedorizvekov.soundbrowser.ui.component.CatalogStatus;
+import com.fedorizvekov.soundbrowser.ui.component.SoundList;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ListChangeListener;
 import javafx.collections.ObservableList;
 import javafx.collections.transformation.FilteredList;
 import javafx.geometry.Insets;
-import javafx.geometry.Pos;
-import javafx.scene.control.Button;
-import javafx.scene.control.Label;
-import javafx.scene.control.ListView;
-import javafx.scene.control.OverrunStyle;
-import javafx.scene.control.ProgressIndicator;
-import javafx.scene.control.TextField;
-import javafx.scene.control.Tooltip;
 import javafx.scene.layout.BorderPane;
-import javafx.scene.layout.HBox;
-import javafx.scene.layout.Priority;
-import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.stage.DirectoryChooser;
+import javafx.stage.FileChooser;
 
 public final class SoundBrowserView extends BorderPane {
 
-    private static final String STATUS_WARNING_STYLE = "status-warning";
-    private static final String STATUS_ERROR_STYLE = "status-error";
-
     private final SoundCatalogService soundCatalogService;
-    private final AudioPlayer audioPlayer;
-    private final WaveformService waveformService;
+    private final JsonlExportService jsonlExportService;
 
-    private final Label directoryLabel = new Label("No directory selected");
-    private final Label foundCountLabel = new Label("0 found");
-    private final Label totalCountLabel = new Label("0 total");
-    private final Label errorCountLabel = new Label();
-    private final Label oggCountLabel = new Label();
-    private final Label statusLabel = new Label();
-
-    private final TextField searchField = new TextField();
-    private final Button openDirectoryButton = new Button("Open Directory");
-    private final ProgressIndicator loadingIndicator = new ProgressIndicator();
-
-    private final ListView<SoundEntry> soundList = new ListView<>();
     private final ObservableList<SoundEntry> sounds = FXCollections.observableArrayList();
     private final FilteredList<SoundEntry> filteredSounds = new FilteredList<>(sounds);
+
+    private final BrowserHeader header = new BrowserHeader();
+    private final CatalogStatus statusView = new CatalogStatus();
+    private final SoundList soundList;
 
     private int errorCount;
     private int oggCount;
 
+    private boolean loading;
+    private boolean exporting;
+
 
     public SoundBrowserView(
             SoundCatalogService soundCatalogService,
+            JsonlExportService jsonlExportService,
             AudioPlayer audioPlayer,
             WaveformService waveformService
     ) {
         this.soundCatalogService = soundCatalogService;
-        this.audioPlayer = audioPlayer;
-        this.waveformService = waveformService;
+        this.jsonlExportService = jsonlExportService;
+
+        soundList = new SoundList(filteredSounds, audioPlayer, waveformService);
 
         configureView();
         configureActions();
-        updateCountLabels();
+        updateState();
     }
 
 
     private void configureView() {
         getStyleClass().add("sound-browser");
-        setPadding(new Insets(16));
 
-        configureDirectoryLabel();
-        configureSearchField();
-        configureLoadingIndicator();
-        configureStatusLabel();
-        configureSoundList();
-        configureCountLabels();
+        var browserHeader = new VBox(12, header, statusView);
 
-        var titleLabel = new Label("Sound Library");
-        titleLabel.getStyleClass().add("library-title");
+        browserHeader.getStyleClass().add("browser-header");
 
-        var separatorLabel = new Label("·");
-        separatorLabel.getStyleClass().add("directory-separator");
-
-        var headerSpacer = new Region();
-        HBox.setHgrow(headerSpacer, Priority.ALWAYS);
-
-        openDirectoryButton.getStyleClass().add("primary-button");
-
-        var directoryBar = new HBox(
-                10,
-                openDirectoryButton,
-                titleLabel,
-                separatorLabel,
-                directoryLabel,
-                headerSpacer,
-                loadingIndicator
-        );
-
-        directoryBar.setAlignment(Pos.CENTER_LEFT);
-
-        var countBar = new HBox(
-                6,
-                foundCountLabel,
-                totalCountLabel,
-                errorCountLabel,
-                oggCountLabel
-        );
-
-        countBar.setAlignment(Pos.CENTER_LEFT);
-        countBar.setMaxWidth(Double.MAX_VALUE);
-
-        var header = new VBox(
-                12,
-                directoryBar,
-                searchField,
-                countBar,
-                statusLabel
-        );
-
-        header.getStyleClass().add("browser-header");
-
-        setTop(header);
+        setTop(browserHeader);
         setCenter(soundList);
 
         BorderPane.setMargin(soundList, new Insets(12, 0, 0, 0));
     }
 
 
-    private void configureDirectoryLabel() {
-        directoryLabel.getStyleClass().add("directory-path");
-        directoryLabel.setTextOverrun(OverrunStyle.CENTER_ELLIPSIS);
-        directoryLabel.setMaxWidth(Double.MAX_VALUE);
-    }
-
-
-    private void configureSearchField() {
-        searchField.setPromptText("Search by filename or path...");
-        searchField.setDisable(true);
-        searchField.getStyleClass().add("search-field");
-    }
-
-
-    private void configureLoadingIndicator() {
-        loadingIndicator.setPrefSize(18, 18);
-        loadingIndicator.setMaxSize(18, 18);
-        loadingIndicator.setVisible(false);
-        loadingIndicator.setManaged(false);
-    }
-
-
-    private void configureStatusLabel() {
-        statusLabel.getStyleClass().add("status-label");
-        statusLabel.setVisible(false);
-        statusLabel.setManaged(false);
-    }
-
-
-    private void configureCountLabels() {
-
-        foundCountLabel.getStyleClass().addAll("count-label", "found-count-label");
-        totalCountLabel.getStyleClass().addAll("count-label", "total-count-label");
-        errorCountLabel.getStyleClass().add("error-count-label");
-        oggCountLabel.getStyleClass().add("ogg-count-label");
-
-        oggCountLabel.setTooltip(new Tooltip("OGG support is not implemented yet"));
-
-        setLabelVisible(errorCountLabel, false);
-        setLabelVisible(oggCountLabel, false);
-    }
-
-
-    private void configureSoundList() {
-        soundList.setItems(filteredSounds);
-        soundList.setPlaceholder(new Label("Select a directory containing WAV files"));
-        soundList.setCellFactory(list -> new SoundListCell(audioPlayer, waveformService));
-        soundList.getStyleClass().add("sound-list");
-    }
-
-
     private void configureActions() {
+        header.setOnOpenDirectory(this::selectDirectory);
+        header.setOnExportJsonl(this::selectExportTarget);
+        header.setOnSearch(this::filterSounds);
 
-        openDirectoryButton.setOnAction(event -> selectDirectory());
-
-        searchField.textProperty().addListener(
-                (observable, oldValue, newValue) -> filterSounds(newValue)
-        );
-
-        filteredSounds.addListener(
-                (ListChangeListener<SoundEntry>) change -> updateCountLabels()
-        );
+        filteredSounds.addListener((ListChangeListener<SoundEntry>) change -> updateState());
     }
 
 
@@ -214,68 +100,68 @@ public final class SoundBrowserView extends BorderPane {
     private void loadDirectory(Path directory) {
 
         setLoading(true);
-        hideStatus();
 
-        directoryLabel.setText(directory.toString());
-        directoryLabel.setTooltip(new Tooltip(directory.toString()));
+        header.setDirectory(directory);
+        header.clearSearch();
 
-        searchField.clear();
         sounds.clear();
-
         errorCount = 0;
         oggCount = 0;
 
-        updateCountLabels();
-        showStatus("Scanning audio files...", null);
+        statusView.showInfo("Scanning audio files...");
+        updateState();
 
-        Thread.startVirtualThread(() -> {
+        Thread.ofVirtual().name("sound-catalog-loader").start(() -> loadCatalog(directory));
+    }
 
-            try {
 
-                var result = soundCatalogService.load(directory);
-                Platform.runLater(() -> applyCatalogResult(result));
+    private void loadCatalog(Path directory) {
 
-            } catch (Exception exception) {
-                Platform.runLater(() -> handleLoadingFailure(exception));
-            }
-        });
+        try {
+            var result = soundCatalogService.load(directory);
+
+            Platform.runLater(() -> applyCatalogResult(result));
+
+        } catch (Exception exception) {
+            Platform.runLater(() -> handleLoadingFailure(exception));
+        }
     }
 
 
     private void applyCatalogResult(CatalogResult result) {
+
         errorCount = result.errors().size();
         oggCount = result.oggFiles().size();
+
         sounds.setAll(result.entries());
 
         setLoading(false);
-        updateCountLabels();
+        updateState();
 
         if (errorCount == 0) {
-            hideStatus();
+            statusView.clearStatus();
             return;
         }
 
-        showStatus(formatSkippedFiles(errorCount), STATUS_WARNING_STYLE);
+        statusView.showWarning(formatSkippedFiles(errorCount));
     }
 
 
     private void handleLoadingFailure(Exception exception) {
+
         sounds.clear();
         errorCount = 0;
         oggCount = 0;
 
         setLoading(false);
-        updateCountLabels();
+        updateState();
 
-        var message = exception.getMessage() == null
-                ? exception.getClass().getSimpleName()
-                : exception.getMessage();
-
-        showStatus("Failed to load directory: " + message, STATUS_ERROR_STYLE);
+        statusView.showError("Failed to load directory: " + formatException(exception));
     }
 
 
     private void filterSounds(String query) {
+
         var normalizedQuery = normalize(query);
 
         filteredSounds.setPredicate(entry -> {
@@ -283,30 +169,98 @@ public final class SoundBrowserView extends BorderPane {
                 return true;
             }
 
-            return normalize(entry.filename()).contains(normalizedQuery) || normalize(entry.relativePath().toString()).contains(normalizedQuery);
+            return normalize(entry.filename()).contains(normalizedQuery)
+                    || normalize(entry.relativePath().toString()).contains(normalizedQuery);
 
         });
     }
 
 
-    private void updateCountLabels() {
-        var found = filteredSounds.size();
-        var total = sounds.size() + errorCount + oggCount;
+    private void selectExportTarget() {
 
-        foundCountLabel.setText("%,d found".formatted(found));
-        totalCountLabel.setText("%,d total".formatted(total));
-        errorCountLabel.setText(formatErrorCount(errorCount));
-        oggCountLabel.setText("%,d OGG found".formatted(oggCount));
+        if (filteredSounds.isEmpty()) {
+            return;
+        }
 
-        setLabelVisible(errorCountLabel, errorCount > 0);
-        setLabelVisible(oggCountLabel, oggCount > 0);
+        var chooser = new FileChooser();
+
+        chooser.setTitle("Export sound library");
+        chooser.setInitialFileName("sound_library");
+        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("JSON Lines (*.jsonl)", "*.jsonl"));
+
+        var selectedFile = chooser.showSaveDialog(getScene().getWindow());
+
+        if (selectedFile == null) {
+            return;
+        }
+
+        var entries = List.copyOf(filteredSounds);
+        var targetFile = ensureJsonlExtension(selectedFile.toPath());
+
+        startExport(entries, targetFile);
     }
 
 
-    private String formatErrorCount(int count) {
-        return count == 1
-                ? "1 WAV error"
-                : "%,d WAV errors".formatted(count);
+    private void startExport(List<SoundEntry> entries, Path targetFile) {
+
+        setExporting(true);
+
+        statusView.showInfo("Exporting %,d sounds...".formatted(entries.size()));
+
+        Thread.ofVirtual().name("jsonl-exporter").start(() -> exportJsonl(entries, targetFile));
+    }
+
+
+    private void exportJsonl(List<SoundEntry> entries, Path targetFile) {
+
+        try {
+            var result = jsonlExportService.export(entries, targetFile);
+
+            Platform.runLater(() -> handleExportSuccess(result));
+
+        } catch (IOException exception) {
+
+            Platform.runLater(() -> handleExportFailure(exception));
+
+        }
+    }
+
+
+    private void handleExportSuccess(JsonlExportResult result) {
+        setExporting(false);
+        statusView.showSuccess("%,d sounds exported to %s".formatted(result.exportedCount(), result.file().getFileName()));
+    }
+
+
+    private void handleExportFailure(IOException exception) {
+        setExporting(false);
+        statusView.showError("JSONL export failed: " + formatException(exception));
+    }
+
+
+    private void updateState() {
+
+        statusView.updateCounts(filteredSounds.size(), sounds.size(), errorCount, oggCount);
+
+        header.setHasSounds(!sounds.isEmpty());
+        header.setExportAvailable(!filteredSounds.isEmpty());
+
+        var busy = loading || exporting;
+        soundList.setDisable(busy);
+    }
+
+
+    private void setLoading(boolean loading) {
+        this.loading = loading;
+        header.setLoading(loading);
+        updateState();
+    }
+
+
+    private void setExporting(boolean exporting) {
+        this.exporting = exporting;
+        header.setExporting(exporting);
+        updateState();
     }
 
 
@@ -317,44 +271,32 @@ public final class SoundBrowserView extends BorderPane {
     }
 
 
+    private String formatException(Exception exception) {
+
+        var message = exception.getMessage();
+
+        if (message == null || message.isBlank()) {
+            return exception.getClass().getSimpleName();
+        }
+
+        return message;
+    }
+
+
     private String normalize(String value) {
+
         return value == null ? "" : value.strip().toLowerCase(Locale.ROOT);
     }
 
 
-    private void setLoading(boolean loading) {
-        openDirectoryButton.setDisable(loading);
-        searchField.setDisable(loading || sounds.isEmpty());
-        soundList.setDisable(loading);
+    private Path ensureJsonlExtension(Path file) {
 
-        loadingIndicator.setVisible(loading);
-        loadingIndicator.setManaged(loading);
-    }
+        var filename = file.getFileName().toString();
 
-
-    private void setLabelVisible(Label label, boolean visible) {
-        label.setVisible(visible);
-        label.setManaged(visible);
-    }
-
-
-    private void showStatus(String text, String additionalStyleClass) {
-        statusLabel.setText(text);
-        statusLabel.getStyleClass().removeAll(STATUS_WARNING_STYLE, STATUS_ERROR_STYLE);
-
-        if (additionalStyleClass != null) {
-            statusLabel.getStyleClass().add(additionalStyleClass);
+        if (filename.toLowerCase(Locale.ROOT).endsWith(".jsonl")) {
+            return file;
         }
 
-        statusLabel.setVisible(true);
-        statusLabel.setManaged(true);
+        return file.resolveSibling(filename + ".jsonl");
     }
-
-
-    private void hideStatus() {
-        statusLabel.setText("");
-        statusLabel.setVisible(false);
-        statusLabel.setManaged(false);
-    }
-
 }

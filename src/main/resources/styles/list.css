@@ -1,0 +1,59 @@
+.sound-list {
+    -fx-background-color: #f4f5f5;
+    -fx-control-inner-background: #f4f5f5;
+    -fx-background-insets: 0;
+    -fx-background-radius: 10px;
+    -fx-border-color: #d5d9da;
+    -fx-border-radius: 10px;
+}
+
+.sound-list:focused {
+    -fx-border-color: #ffb27a;
+    -fx-focus-color: transparent;
+    -fx-faint-focus-color: transparent;
+}
+
+.sound-list .list-cell:filled {
+    -fx-background-color: #f6f7f7;
+    -fx-border-color: transparent transparent #dfe3e3 transparent;
+}
+
+.sound-list .list-cell:empty {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+}
+
+.sound-list .list-cell:filled:hover {
+    -fx-background-color: #fff4eb;
+}
+
+.sound-list .list-cell:filled:selected {
+    -fx-background-color: #ffe3cf;
+}
+
+.sound-list .list-cell:filled:selected:hover {
+    -fx-background-color: #ffdbc0;
+}
+
+.sound-cell-content {
+    -fx-padding: 9px 12px;
+}
+
+.sound-name {
+    -fx-font-weight: bold;
+    -fx-text-fill: #303638;
+}
+
+.sound-path,
+.sound-metadata {
+    -fx-text-fill: #667073;
+}
+
+.sound-list .list-cell:filled:selected .sound-name {
+    -fx-text-fill: #4a2000;
+}
+
+.sound-list .list-cell:filled:selected .sound-path,
+.sound-list .list-cell:filled:selected .sound-metadata {
+    -fx-text-fill: #70401c;
+}

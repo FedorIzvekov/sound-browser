@@ -1,11 +1,14 @@
-package com.fedorizvekov.soundbrowser.ui;
+package com.fedorizvekov.soundbrowser.ui.component;
 
 import com.fedorizvekov.soundbrowser.model.Waveform;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.layout.Region;
 import javafx.scene.paint.Color;
 
-final class WaveformView extends Region {
+public final class WaveformView extends Region {
+
+    private static final double VIEW_WIDTH = 360.0;
+    private static final double VIEW_HEIGHT = 56.0;
 
     private static final Color WAVEFORM_COLOR = Color.web("#ff7a18");
     private static final Color CENTER_LINE_COLOR = Color.web("#d3d7d8");
@@ -15,18 +18,18 @@ final class WaveformView extends Region {
     private Waveform waveform;
 
 
-    WaveformView() {
+    public WaveformView() {
         getStyleClass().add("waveform-view");
         getChildren().add(canvas);
 
-        setMinSize(220, 56);
-        setPrefSize(360, 56);
-        setMaxSize(440, 56);
+        setMinSize(VIEW_WIDTH, VIEW_HEIGHT);
+        setPrefSize(VIEW_WIDTH, VIEW_HEIGHT);
+        setMaxSize(VIEW_WIDTH, VIEW_HEIGHT);
         setMouseTransparent(true);
     }
 
 
-    void setWaveform(Waveform waveform) {
+    public void setWaveform(Waveform waveform) {
         this.waveform = waveform;
         redraw();
     }

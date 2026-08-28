@@ -39,7 +39,7 @@ class AudioPlayerTest {
     @Mock(answer = Answers.CALLS_REAL_METHODS)
     private MockedStatic<AudioSystem> audioSystem;
 
-    private Path file = AUDIO_DIR.resolve("test_signal_16bit.wav");
+    private final Path file = AUDIO_DIR.resolve("test_signal_16bit.wav");
 
 
     @Test
