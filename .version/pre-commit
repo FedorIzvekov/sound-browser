@@ -1,0 +1,6 @@
+#!/bin/sh
+
+PROJECT_ROOT="$(git rev-parse --show-toplevel)" || exit 1
+
+python3 "$PROJECT_ROOT/.version/update_version.py"
+exit $?
