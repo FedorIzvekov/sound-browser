@@ -12,12 +12,14 @@ import javafx.beans.binding.Bindings;
 import javafx.css.PseudoClass;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
+import javafx.scene.control.CheckBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.OverrunStyle;
 import javafx.scene.control.Tooltip;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
+import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 
 public final class SoundListCell extends ListCell<SoundEntry> {
@@ -27,6 +29,8 @@ public final class SoundListCell extends ListCell<SoundEntry> {
     private final AudioPlayer audioPlayer;
     private final WaveformService waveformService;
 
+    private final CheckBox exportCheckBox = new CheckBox();
+    private final StackPane exportColumn = new StackPane(exportCheckBox);
     private final Button playButton = new Button("▶");
     private final Label filenameLabel = new Label();
     private final Label pathLabel = new Label();
@@ -45,18 +49,50 @@ public final class SoundListCell extends ListCell<SoundEntry> {
         this.audioPlayer = audioPlayer;
         this.waveformService = waveformService;
 
+        configureExportCheckBox();
         configurePlayButton();
         configureSoundInfo();
 
+        exportColumn.setMinWidth(SoundListHeader.EXPORT_WIDTH);
+        exportColumn.setPrefWidth(SoundListHeader.EXPORT_WIDTH);
+        exportColumn.setMaxWidth(SoundListHeader.EXPORT_WIDTH);
+
         content.getStyleClass().add("sound-cell-content");
         content.setAlignment(Pos.CENTER_LEFT);
-        content.getChildren().addAll(playButton, soundInfo, waveformView);
+        content.getChildren().addAll(exportColumn, playButton, soundInfo, waveformView);
 
         HBox.setHgrow(soundInfo, Priority.ALWAYS);
 
         content.prefWidthProperty().bind(
-                Bindings.createDoubleBinding(() -> Math.max(0.0, getWidth() - 28.0), widthProperty())
+
+                Bindings.createDoubleBinding(
+                        () -> Math.max(0.0, getWidth() - getInsets().getLeft() - getInsets().getRight()),
+                        widthProperty(),
+                        insetsProperty()
+                )
         );
+
+    }
+
+
+    private void configureExportCheckBox() {
+
+        exportCheckBox.getStyleClass().add("export-checkbox");
+        exportCheckBox.setTooltip(new Tooltip("Include sound in JSONL export"));
+        exportCheckBox.setAccessibleText("Include sound in JSONL export");
+        exportCheckBox.setFocusTraversable(false);
+        exportCheckBox.setDisable(true);
+
+        exportCheckBox.setOnAction(event -> {
+
+            var entry = getItem();
+
+            if (entry != null) {
+                ((SoundList) getListView()).setSelectedForExport(entry, exportCheckBox.isSelected());
+            }
+
+            event.consume();
+        });
     }
 
 
@@ -69,6 +105,9 @@ public final class SoundListCell extends ListCell<SoundEntry> {
             clearContent();
             return;
         }
+
+        exportCheckBox.setSelected(((SoundList) getListView()).isSelectedForExport(entry));
+        exportCheckBox.setDisable(false);
 
         var relativePath = entry.relativePath().toString();
 
@@ -215,6 +254,9 @@ public final class SoundListCell extends ListCell<SoundEntry> {
 
 
     private void clearContent() {
+        exportCheckBox.setSelected(false);
+        exportCheckBox.setDisable(true);
+
         filenameLabel.setText("");
         pathLabel.setText("");
         pathTooltip.setText("");

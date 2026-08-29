@@ -14,6 +14,7 @@ import com.fedorizvekov.soundbrowser.service.export.JsonlExportService;
 import com.fedorizvekov.soundbrowser.ui.component.BrowserHeader;
 import com.fedorizvekov.soundbrowser.ui.component.CatalogStatus;
 import com.fedorizvekov.soundbrowser.ui.component.SoundList;
+import com.fedorizvekov.soundbrowser.ui.component.SoundListHeader;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ListChangeListener;
@@ -21,6 +22,7 @@ import javafx.collections.ObservableList;
 import javafx.collections.transformation.FilteredList;
 import javafx.geometry.Insets;
 import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.stage.DirectoryChooser;
 import javafx.stage.FileChooser;
@@ -35,6 +37,7 @@ public final class SoundBrowserView extends BorderPane {
 
     private final BrowserHeader header = new BrowserHeader();
     private final CatalogStatus statusView = new CatalogStatus();
+    private final SoundListHeader soundListHeader = new SoundListHeader();
     private final SoundList soundList;
 
     private int errorCount;
@@ -63,15 +66,14 @@ public final class SoundBrowserView extends BorderPane {
 
     private void configureView() {
         getStyleClass().add("sound-browser");
-
         var browserHeader = new VBox(12, header, statusView);
-
         browserHeader.getStyleClass().add("browser-header");
-
         setTop(browserHeader);
-        setCenter(soundList);
 
-        BorderPane.setMargin(soundList, new Insets(12, 0, 0, 0));
+        var listContainer = new VBox(4, soundListHeader, soundList);
+        VBox.setVgrow(soundList, Priority.ALWAYS);
+        setCenter(listContainer);
+        BorderPane.setMargin(listContainer, new Insets(12, 0, 0, 0));
     }
 
 
@@ -105,6 +107,8 @@ public final class SoundBrowserView extends BorderPane {
         header.clearSearch();
 
         sounds.clear();
+        soundList.resetExportSelection();
+
         errorCount = 0;
         oggCount = 0;
 
@@ -136,7 +140,6 @@ public final class SoundBrowserView extends BorderPane {
         sounds.setAll(result.entries());
 
         setLoading(false);
-        updateState();
 
         if (errorCount == 0) {
             statusView.clearStatus();
@@ -154,7 +157,6 @@ public final class SoundBrowserView extends BorderPane {
         oggCount = 0;
 
         setLoading(false);
-        updateState();
 
         statusView.showError("Failed to load directory: " + formatException(exception));
     }
@@ -178,7 +180,10 @@ public final class SoundBrowserView extends BorderPane {
 
     private void selectExportTarget() {
 
-        if (filteredSounds.isEmpty()) {
+        var entries = soundList.getEntriesForExport();
+
+        if (entries.isEmpty()) {
+            statusView.showWarning("No sounds selected for export");
             return;
         }
 
@@ -194,7 +199,6 @@ public final class SoundBrowserView extends BorderPane {
             return;
         }
 
-        var entries = List.copyOf(filteredSounds);
         var targetFile = ensureJsonlExtension(selectedFile.toPath());
 
         startExport(entries, targetFile);

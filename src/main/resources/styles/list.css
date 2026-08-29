@@ -13,6 +13,10 @@
     -fx-faint-focus-color: transparent;
 }
 
+.sound-list .list-cell {
+    -fx-padding: 0;
+}
+
 .sound-list .list-cell:filled {
     -fx-background-color: #f6f7f7;
     -fx-border-color: transparent transparent #dfe3e3 transparent;
@@ -56,4 +60,38 @@
 .sound-list .list-cell:filled:selected .sound-path,
 .sound-list .list-cell:filled:selected .sound-metadata {
     -fx-text-fill: #70401c;
+}
+
+.sound-list-header {
+    -fx-padding: 0 28px 4px 12px;
+}
+
+.sound-list-column-title {
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #697174;
+}
+
+.export-checkbox {
+    -fx-cursor: hand;
+}
+
+.export-checkbox .box {
+    -fx-background-color: #fafafa;
+    -fx-background-radius: 4px;
+    -fx-border-color: #b8c0c2;
+    -fx-border-radius: 4px;
+}
+
+.export-checkbox:hover .box {
+    -fx-border-color: #ff7a18;
+}
+
+.export-checkbox:selected .box {
+    -fx-background-color: #ff7a18;
+    -fx-border-color: #ff7a18;
+}
+
+.export-checkbox:selected .mark {
+    -fx-background-color: #3d1b00;
 }
