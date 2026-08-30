@@ -1,23 +1,45 @@
-# Sound Browser v.1.0.13
-A desktop application for browsing, previewing, and analyzing sound effects in a selected directory.
+# Sound Browser v1.0.14
+A desktop application for browsing, previewing, filtering, and analyzing sound effects in a selected directory.
 
 ## ✨ Features
 
 - Recursively scans a selected directory for WAV sound effects.
-- Displays audio metadata such as duration, sample rate, channel count, bit depth, encoding, and file size.
+- Displays duration, sample rate, channel count, bit depth, encoding, and file size.
 - Generates waveform previews for easier sound effect selection.
-- Allows discovered sound effects to be played directly from the application.
-- Allows generating a plain-text list of discovered sound effects for further analysis.
+- Plays included sound effects sequentially from the current search results.
+- Allows sounds to be manually included in or excluded from playback and export.
+- Exports selected sounds to JSONL with metadata, audio features, and compact amplitude envelopes.
 
 ## ⚙️ Requirements
 
 - Java 25 LTS
-- Maven 3.9+
 
 ## ▶️ Run
 
-```shell
-mvn clean package
+### macOS / Linux
 
-java -jar target/sound-browser-1.0.13.jar
+```bash
+./mvnw javafx:run
+```
+
+### Windows
+
+```powershell
+.\mvnw.cmd javafx:run
+```
+
+## 📦 Build
+
+### macOS / Linux
+
+```bash
+./mvnw clean package
+java -jar target/sound-browser-1.0.14.jar
+```
+
+### Windows
+
+```powershell
+.\mvnw.cmd clean package
+java -jar target\sound-browser-1.0.14.jar
 ```

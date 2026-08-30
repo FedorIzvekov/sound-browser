@@ -43,7 +43,7 @@ def update_pom(current_version: str, version: str) -> None:
         rf"(<version>){re.escape(current_version)}(</version>)",
         rf"\g<1>{version}\g<2>",
         content,
-        count=1,
+        count=1
     )
 
     POM_FILE.write_text(content, encoding="utf-8")
@@ -54,16 +54,16 @@ def update_readme(project_name: str, artifact_id: str, version: str) -> None:
 
     content = re.sub(
         rf"^# {re.escape(project_name)}(?: v\.\d+\.\d+\.\d+)?$",
-        f"# {project_name} v.{version}",
+        f"# {project_name} v{version}",
         content,
         count=1,
-        flags=re.MULTILINE,
+        flags=re.MULTILINE
     )
 
     content = re.sub(
-        rf"target/{re.escape(artifact_id)}-\d+\.\d+\.\d+\.jar",
-        f"target/{artifact_id}-{version}.jar",
-        content,
+        rf"(target[\\/]{re.escape(artifact_id)}-)\d+\.\d+\.\d+(\.jar)",
+        rf"\g<1>{version}\g<2>",
+        content
     )
 
     README_FILE.write_text(content, encoding="utf-8")
