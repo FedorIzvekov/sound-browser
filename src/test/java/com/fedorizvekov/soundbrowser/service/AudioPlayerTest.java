@@ -3,10 +3,12 @@ package com.fedorizvekov.soundbrowser.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
@@ -14,15 +16,20 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.nio.file.Path;
+import java.util.concurrent.atomic.AtomicReference;
 import javax.sound.sampled.AudioInputStream;
 import javax.sound.sampled.AudioSystem;
 import javax.sound.sampled.Clip;
+import javax.sound.sampled.LineEvent;
+import javax.sound.sampled.LineListener;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.mockito.Answers;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -36,10 +43,21 @@ class AudioPlayerTest {
     @Mock
     private Clip clip;
 
-    @Mock(answer = Answers.CALLS_REAL_METHODS)
     private MockedStatic<AudioSystem> audioSystem;
 
     private final Path file = AUDIO_DIR.resolve("test_signal_16bit.wav");
+
+
+    @BeforeEach
+    void setUp() {
+        audioSystem = mockStatic(AudioSystem.class, CALLS_REAL_METHODS);
+    }
+
+
+    @AfterEach
+    void tearDown() {
+        audioSystem.close();
+    }
 
 
     @Test
@@ -119,6 +137,7 @@ class AudioPlayerTest {
             "test_waveform.wav"
     })
     void shouldPlayWavFile(String filename) throws Exception {
+
         var file = AUDIO_DIR.resolve(filename);
 
         audioSystem.when(AudioSystem::getClip).thenReturn(clip);
@@ -129,10 +148,60 @@ class AudioPlayerTest {
 
         assertAll(
                 () -> verify(clip).open(any(AudioInputStream.class)),
+                () -> verify(clip).addLineListener(any(LineListener.class)),
                 () -> verify(clip).setFramePosition(0),
                 () -> verify(clip).start(),
-                () -> assertThat(audioPlayer.getCurrentFile()).isEqualTo(file)
+                () -> assertThat(audioPlayer.getCurrentFile()).isEqualTo(file),
+                () -> assertThat(audioPlayer.isPaused()).isFalse()
         );
+    }
+
+
+    @Test
+    @DisplayName("should notify when playback reaches the end")
+    void shouldNotifyWhenPlaybackReachesTheEnd() throws Exception {
+
+        var finishedFile = new AtomicReference<Path>();
+        var listenerCaptor = ArgumentCaptor.forClass(LineListener.class);
+
+        audioSystem.when(AudioSystem::getClip).thenReturn(clip);
+        when(clip.getFrameLength()).thenReturn(100);
+
+        var audioPlayer = new AudioPlayer();
+        audioPlayer.setOnPlaybackFinished(finishedFile::set);
+
+        audioPlayer.play(file);
+
+        verify(clip).addLineListener(listenerCaptor.capture());
+
+        var event = new LineEvent(clip, LineEvent.Type.STOP, 100);
+        listenerCaptor.getValue().update(event);
+
+        assertThat(finishedFile).hasValue(file);
+    }
+
+
+    @Test
+    @DisplayName("should not notify when playback stops before the end")
+    void shouldNotNotifyWhenPlaybackStopsBeforeTheEnd() throws Exception {
+
+        var finishedFile = new AtomicReference<Path>();
+        var listenerCaptor = ArgumentCaptor.forClass(LineListener.class);
+
+        audioSystem.when(AudioSystem::getClip).thenReturn(clip);
+        when(clip.getFrameLength()).thenReturn(100);
+
+        var audioPlayer = new AudioPlayer();
+        audioPlayer.setOnPlaybackFinished(finishedFile::set);
+
+        audioPlayer.play(file);
+
+        verify(clip).addLineListener(listenerCaptor.capture());
+
+        var event = new LineEvent(clip, LineEvent.Type.STOP, 50);
+        listenerCaptor.getValue().update(event);
+
+        assertThat(finishedFile).hasNullValue();
     }
 
 
@@ -141,14 +210,17 @@ class AudioPlayerTest {
     void shouldPauseCurrentAudio() throws Exception {
 
         audioSystem.when(AudioSystem::getClip).thenReturn(clip);
-        when(clip.isRunning()).thenReturn(true);
+        when(clip.isOpen()).thenReturn(true);
 
         var audioPlayer = new AudioPlayer();
 
         audioPlayer.play(file);
         audioPlayer.pause();
 
-        verify(clip).stop();
+        assertAll(
+                () -> verify(clip).stop(),
+                () -> assertThat(audioPlayer.isPaused()).isTrue()
+        );
     }
 
 
@@ -157,19 +229,22 @@ class AudioPlayerTest {
     void shouldResumeCurrentAudio() throws Exception {
 
         audioSystem.when(AudioSystem::getClip).thenReturn(clip);
-
-        var audioPlayer = new AudioPlayer();
-
-        audioPlayer.play(file);
-
         when(clip.isOpen()).thenReturn(true);
         when(clip.isRunning()).thenReturn(false);
         when(clip.getFramePosition()).thenReturn(10);
         when(clip.getFrameLength()).thenReturn(100);
 
+        var audioPlayer = new AudioPlayer();
+
+        audioPlayer.play(file);
+        audioPlayer.pause();
         audioPlayer.resume();
 
-        verify(clip, times(2)).start();
+        assertAll(
+                () -> verify(clip).stop(),
+                () -> verify(clip, times(2)).start(),
+                () -> assertThat(audioPlayer.isPaused()).isFalse()
+        );
     }
 
 
@@ -178,21 +253,20 @@ class AudioPlayerTest {
     void shouldRestartFinishedAudio() throws Exception {
 
         audioSystem.when(AudioSystem::getClip).thenReturn(clip);
-
-        var audioPlayer = new AudioPlayer();
-
-        audioPlayer.play(file);
-
         when(clip.isOpen()).thenReturn(true);
         when(clip.isRunning()).thenReturn(false);
         when(clip.getFramePosition()).thenReturn(100);
         when(clip.getFrameLength()).thenReturn(100);
 
+        var audioPlayer = new AudioPlayer();
+
+        audioPlayer.play(file);
         audioPlayer.resume();
 
         assertAll(
                 () -> verify(clip, times(2)).setFramePosition(0),
-                () -> verify(clip, times(2)).start()
+                () -> verify(clip, times(2)).start(),
+                () -> assertThat(audioPlayer.isPaused()).isFalse()
         );
     }
 
@@ -207,13 +281,15 @@ class AudioPlayerTest {
         var audioPlayer = new AudioPlayer();
 
         audioPlayer.play(file);
+        audioPlayer.pause();
         audioPlayer.stop();
 
         assertAll(
-                () -> verify(clip).stop(),
+                () -> verify(clip, times(2)).stop(),
                 () -> verify(clip).flush(),
                 () -> verify(clip).close(),
-                () -> assertThat(audioPlayer.getCurrentFile()).isNull()
+                () -> assertThat(audioPlayer.getCurrentFile()).isNull(),
+                () -> assertThat(audioPlayer.isPaused()).isFalse()
         );
     }
 
@@ -221,6 +297,7 @@ class AudioPlayerTest {
     @Test
     @DisplayName("should stop previous audio before playing another")
     void shouldStopPreviousAudioBeforePlayingAnother() throws Exception {
+
         var firstFile = AUDIO_DIR.resolve("test_signal_16bit.wav");
         var secondFile = AUDIO_DIR.resolve("test_waveform.wav");
 
@@ -228,6 +305,7 @@ class AudioPlayerTest {
         var secondClip = mock(Clip.class);
 
         when(firstClip.isOpen()).thenReturn(true);
+
         audioSystem.when(AudioSystem::getClip).thenReturn(firstClip, secondClip);
 
         var audioPlayer = new AudioPlayer();
@@ -240,6 +318,7 @@ class AudioPlayerTest {
                 () -> verify(firstClip).flush(),
                 () -> verify(firstClip).close(),
                 () -> verify(secondClip).open(any(AudioInputStream.class)),
+                () -> verify(secondClip).addLineListener(any(LineListener.class)),
                 () -> verify(secondClip).setFramePosition(0),
                 () -> verify(secondClip).start(),
                 () -> assertThat(audioPlayer.getCurrentFile()).isEqualTo(secondFile)

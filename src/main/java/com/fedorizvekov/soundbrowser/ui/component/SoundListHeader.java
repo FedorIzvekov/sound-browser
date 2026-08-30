@@ -7,7 +7,7 @@ import javafx.scene.layout.Priority;
 
 public final class SoundListHeader extends HBox {
 
-    public static final double EXPORT_WIDTH = 52.0;
+    public static final double INCLUDE_WIDTH = 52.0;
     public static final double PREVIEW_WIDTH = 38.0;
     public static final double WAVEFORM_WIDTH = 360.0;
 
@@ -19,23 +19,23 @@ public final class SoundListHeader extends HBox {
         getStyleClass().add("sound-list-header");
         setAlignment(Pos.CENTER_LEFT);
 
-        var exportLabel = createLabel("Export");
+        var includeLabel = createLabel("Include");
         var previewLabel = createLabel("Preview");
         var soundLabel = createLabel("Sound");
         var waveformLabel = createLabel("Waveform");
 
-        setFixedWidth(exportLabel, EXPORT_WIDTH);
+        setFixedWidth(includeLabel, INCLUDE_WIDTH);
         setFixedWidth(previewLabel, PREVIEW_WIDTH);
         setFixedWidth(waveformLabel, WAVEFORM_WIDTH);
 
-        exportLabel.setAlignment(Pos.CENTER);
+        includeLabel.setAlignment(Pos.CENTER);
         previewLabel.setAlignment(Pos.CENTER);
         waveformLabel.setAlignment(Pos.CENTER_LEFT);
 
         soundLabel.setMaxWidth(Double.MAX_VALUE);
         HBox.setHgrow(soundLabel, Priority.ALWAYS);
 
-        getChildren().addAll(exportLabel, previewLabel, soundLabel, waveformLabel);
+        getChildren().addAll(includeLabel, previewLabel, soundLabel, waveformLabel);
     }
 
 

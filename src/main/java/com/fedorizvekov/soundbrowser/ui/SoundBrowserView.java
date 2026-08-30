@@ -4,6 +4,8 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Locale;
+import javax.sound.sampled.LineUnavailableException;
+import javax.sound.sampled.UnsupportedAudioFileException;
 import com.fedorizvekov.soundbrowser.model.CatalogResult;
 import com.fedorizvekov.soundbrowser.model.SoundEntry;
 import com.fedorizvekov.soundbrowser.model.export.JsonlExportResult;
@@ -31,6 +33,7 @@ public final class SoundBrowserView extends BorderPane {
 
     private final SoundCatalogService soundCatalogService;
     private final JsonlExportService jsonlExportService;
+    private final AudioPlayer audioPlayer;
 
     private final ObservableList<SoundEntry> sounds = FXCollections.observableArrayList();
     private final FilteredList<SoundEntry> filteredSounds = new FilteredList<>(sounds);
@@ -55,6 +58,7 @@ public final class SoundBrowserView extends BorderPane {
     ) {
         this.soundCatalogService = soundCatalogService;
         this.jsonlExportService = jsonlExportService;
+        this.audioPlayer = audioPlayer;
 
         soundList = new SoundList(filteredSounds, audioPlayer, waveformService);
 
@@ -65,6 +69,7 @@ public final class SoundBrowserView extends BorderPane {
 
 
     private void configureView() {
+
         getStyleClass().add("sound-browser");
         var browserHeader = new VBox(12, header, statusView);
         browserHeader.getStyleClass().add("browser-header");
@@ -82,11 +87,54 @@ public final class SoundBrowserView extends BorderPane {
         header.setOnExportJsonl(this::selectExportTarget);
         header.setOnSearch(this::filterSounds);
 
+        audioPlayer.setOnPlaybackFinished(file -> Platform.runLater(() -> handlePlaybackFinished(file)));
+
         filteredSounds.addListener((ListChangeListener<SoundEntry>) change -> updateState());
     }
 
 
+    private void handlePlaybackFinished(Path file) {
+
+        if (!file.equals(audioPlayer.getCurrentFile())
+                || audioPlayer.isPaused()
+                || !audioPlayer.isFinished()) {
+            return;
+        }
+
+        playNextIncludedSound(file);
+    }
+
+
+    private void playNextIncludedSound(Path previousFile) {
+
+        var nextEntry = soundList.getNextIncludedEntry(previousFile);
+
+        while (nextEntry.isPresent()) {
+
+            var entry = nextEntry.get();
+
+            try {
+                audioPlayer.play(entry.path());
+                soundList.getSelectionModel().select(entry);
+                soundList.refresh();
+                return;
+
+            } catch (IOException | UnsupportedAudioFileException | LineUnavailableException exception) {
+                previousFile = entry.path();
+                nextEntry = soundList.getNextIncludedEntry(previousFile);
+            }
+        }
+
+        audioPlayer.stop();
+        soundList.refresh();
+    }
+
+
     private void selectDirectory() {
+
+        if (loading || exporting) {
+            return;
+        }
 
         var chooser = new DirectoryChooser();
         chooser.setTitle("Select Sound Directory");
@@ -101,13 +149,14 @@ public final class SoundBrowserView extends BorderPane {
 
     private void loadDirectory(Path directory) {
 
+        audioPlayer.stop();
         setLoading(true);
 
         header.setDirectory(directory);
         header.clearSearch();
 
         sounds.clear();
-        soundList.resetExportSelection();
+        soundList.resetInclusion();
 
         errorCount = 0;
         oggCount = 0;
@@ -164,6 +213,8 @@ public final class SoundBrowserView extends BorderPane {
 
     private void filterSounds(String query) {
 
+        audioPlayer.stop();
+
         var normalizedQuery = normalize(query);
 
         filteredSounds.setPredicate(entry -> {
@@ -173,17 +224,22 @@ public final class SoundBrowserView extends BorderPane {
 
             return normalize(entry.filename()).contains(normalizedQuery)
                     || normalize(entry.relativePath().toString()).contains(normalizedQuery);
-
         });
+
+        soundList.refresh();
     }
 
 
     private void selectExportTarget() {
 
-        var entries = soundList.getEntriesForExport();
+        if (loading || exporting) {
+            return;
+        }
+
+        var entries = soundList.getIncludedEntries();
 
         if (entries.isEmpty()) {
-            statusView.showWarning("No sounds selected for export");
+            statusView.showWarning("No sounds included for export");
             return;
         }
 
@@ -207,6 +263,9 @@ public final class SoundBrowserView extends BorderPane {
 
     private void startExport(List<SoundEntry> entries, Path targetFile) {
 
+        audioPlayer.stop();
+        soundList.refresh();
+
         setExporting(true);
 
         statusView.showInfo("Exporting %,d sounds...".formatted(entries.size()));
@@ -222,10 +281,9 @@ public final class SoundBrowserView extends BorderPane {
 
             Platform.runLater(() -> handleExportSuccess(result));
 
-        } catch (IOException exception) {
+        } catch (IOException | RuntimeException exception) {
 
             Platform.runLater(() -> handleExportFailure(exception));
-
         }
     }
 
@@ -236,7 +294,7 @@ public final class SoundBrowserView extends BorderPane {
     }
 
 
-    private void handleExportFailure(IOException exception) {
+    private void handleExportFailure(Exception exception) {
         setExporting(false);
         statusView.showError("JSONL export failed: " + formatException(exception));
     }
@@ -249,8 +307,7 @@ public final class SoundBrowserView extends BorderPane {
         header.setHasSounds(!sounds.isEmpty());
         header.setExportAvailable(!filteredSounds.isEmpty());
 
-        var busy = loading || exporting;
-        soundList.setDisable(busy);
+        soundList.setDisable(loading || exporting);
     }
 
 

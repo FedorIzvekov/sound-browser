@@ -1,4 +1,4 @@
-# Sound Browser v.1.0.12
+# Sound Browser v.1.0.13
 A desktop application for browsing, previewing, and analyzing sound effects in a selected directory.
 
 ## ✨ Features
@@ -19,5 +19,5 @@ A desktop application for browsing, previewing, and analyzing sound effects in a
 ```shell
 mvn clean package
 
-java -jar target/sound-browser-1.0.12.jar
+java -jar target/sound-browser-1.0.13.jar
 ```
