@@ -11,11 +11,18 @@ import javax.sound.sampled.UnsupportedAudioFileException;
 
 public final class AudioPlayer implements AutoCloseable {
 
+    private final AudioDecoder audioDecoder;
+
     private Clip currentClip;
     private Path currentFile;
     private boolean paused;
 
-    public Consumer<Path> onPlaybackFinished = file -> {};
+    private Consumer<Path> onPlaybackFinished = file -> {};
+
+
+    public AudioPlayer(AudioDecoder audioDecoder) {
+        this.audioDecoder = audioDecoder;
+    }
 
 
     public void setOnPlaybackFinished(Consumer<Path> handler) {
@@ -44,7 +51,7 @@ public final class AudioPlayer implements AutoCloseable {
 
         var clip = AudioSystem.getClip();
 
-        try (var stream = AudioSystem.getAudioInputStream(file.toFile())) {
+        try (var stream = audioDecoder.open(file)) {
 
             clip.open(stream);
 
@@ -64,7 +71,7 @@ public final class AudioPlayer implements AutoCloseable {
             clip.setFramePosition(0);
             clip.start();
 
-        } catch (IOException | UnsupportedAudioFileException | LineUnavailableException | RuntimeException exception) {
+        } catch (IOException | UnsupportedAudioFileException | LineUnavailableException exception) {
             currentClip = null;
             currentFile = null;
             paused = false;

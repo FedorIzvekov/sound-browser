@@ -53,7 +53,7 @@ def update_readme(project_name: str, artifact_id: str, version: str) -> None:
     content = README_FILE.read_text(encoding="utf-8")
 
     content = re.sub(
-        rf"^# {re.escape(project_name)}(?: v\.\d+\.\d+\.\d+)?$",
+        rf"^# {re.escape(project_name)}(?: v\d+\.\d+\.\d+)?$",
         f"# {project_name} v{version}",
         content,
         count=1,

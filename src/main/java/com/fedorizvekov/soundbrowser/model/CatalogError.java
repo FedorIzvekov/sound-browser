@@ -4,6 +4,7 @@ import java.nio.file.Path;
 
 public record CatalogError(
         Path file,
+        AudioFileType fileType,
         Type type,
         String message
 ) {

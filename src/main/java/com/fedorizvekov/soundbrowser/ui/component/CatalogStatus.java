@@ -2,7 +2,6 @@ package com.fedorizvekov.soundbrowser.ui.component;
 
 import javafx.geometry.Pos;
 import javafx.scene.control.Label;
-import javafx.scene.control.Tooltip;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 
@@ -15,7 +14,6 @@ public final class CatalogStatus extends VBox {
     private final Label foundCountLabel = new Label("0 found");
     private final Label totalCountLabel = new Label("0 total");
     private final Label errorCountLabel = new Label();
-    private final Label oggCountLabel = new Label();
     private final Label statusLabel = new Label();
 
 
@@ -29,8 +27,7 @@ public final class CatalogStatus extends VBox {
                 6,
                 foundCountLabel,
                 totalCountLabel,
-                errorCountLabel,
-                oggCountLabel
+                errorCountLabel
         );
 
         countBar.setAlignment(Pos.CENTER_LEFT);
@@ -40,16 +37,12 @@ public final class CatalogStatus extends VBox {
     }
 
 
-    public void updateCounts(int found, int successful, int errors, int oggFiles) {
-        var total = successful + errors + oggFiles;
-
+    public void updateCounts(int found, int total, int errors) {
         foundCountLabel.setText("%,d found".formatted(found));
         totalCountLabel.setText("%,d total".formatted(total));
         errorCountLabel.setText(formatErrorCount(errors));
-        oggCountLabel.setText("%,d OGG found".formatted(oggFiles));
 
         setLabelVisible(errorCountLabel, errors > 0);
-        setLabelVisible(oggCountLabel, oggFiles > 0);
     }
 
 
@@ -83,13 +76,9 @@ public final class CatalogStatus extends VBox {
         foundCountLabel.getStyleClass().addAll("count-label", "found-count-label");
         totalCountLabel.getStyleClass().addAll("count-label", "total-count-label");
         errorCountLabel.getStyleClass().addAll("count-label", "error-count-label");
-        oggCountLabel.getStyleClass().addAll("count-label", "ogg-count-label");
         statusLabel.getStyleClass().add("status-label");
 
-        oggCountLabel.setTooltip(new Tooltip("OGG support is not implemented yet"));
-
         setLabelVisible(errorCountLabel, false);
-        setLabelVisible(oggCountLabel, false);
         setLabelVisible(statusLabel, false);
     }
 
@@ -108,7 +97,7 @@ public final class CatalogStatus extends VBox {
 
 
     private String formatErrorCount(int count) {
-        return count == 1 ? "1 WAV error" : "%,d WAV errors".formatted(count);
+        return count == 1 ? "1 error" : "%,d errors".formatted(count);
     }
 
 

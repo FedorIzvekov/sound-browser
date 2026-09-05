@@ -89,8 +89,7 @@
     -fx-text-fill: #9c4100;
 }
 
-.error-count-label,
-.ogg-count-label {
+.error-count-label {
     -fx-background-color: #fde8e6;
     -fx-text-fill: #b42318;
 }

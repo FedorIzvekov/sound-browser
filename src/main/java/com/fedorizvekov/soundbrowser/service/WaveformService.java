@@ -14,27 +14,29 @@ public final class WaveformService {
     private static final int DEFAULT_POINTS = 500;
     private static final int BUFFER_SIZE = 8192;
 
+    private final AudioDecoder audioDecoder;
     private final int points;
 
 
-    public WaveformService() {
-        this(DEFAULT_POINTS);
+    public WaveformService(AudioDecoder audioDecoder) {
+        this(audioDecoder, DEFAULT_POINTS);
     }
 
 
-    public WaveformService(int points) {
+    public WaveformService(AudioDecoder audioDecoder, int points) {
 
         if (points <= 0) {
             throw new IllegalArgumentException("Waveform points must be greater than zero");
         }
 
+        this.audioDecoder = audioDecoder;
         this.points = points;
     }
 
 
     public Optional<Waveform> analyze(Path file) {
 
-        try (var stream = AudioSystem.getAudioInputStream(file.toFile())) {
+        try (var stream = audioDecoder.open(file)) {
 
             var format = stream.getFormat();
 
@@ -55,7 +57,7 @@ public final class WaveformService {
 
             var framesRead = readWaveform(stream, format, totalFrames, minimums, maximums);
 
-            if (framesRead != totalFrames) {
+            if (framesRead == 0) {
                 return Optional.empty();
             }
 

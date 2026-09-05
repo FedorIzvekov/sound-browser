@@ -2,15 +2,13 @@ package com.fedorizvekov.soundbrowser.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.junit.jupiter.api.Assertions.assertAll;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import javax.sound.sampled.UnsupportedAudioFileException;
+import com.fedorizvekov.soundbrowser.model.AudioFileType;
 import com.fedorizvekov.soundbrowser.model.AudioMetadata;
 import com.fedorizvekov.soundbrowser.model.CatalogError;
 import com.fedorizvekov.soundbrowser.model.SoundEntry;
@@ -18,6 +16,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -26,16 +26,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @DisplayName("SoundCatalogService")
 class SoundCatalogServiceTest {
 
-    private final AudioMetadata metadata = new AudioMetadata(
-            0.3,
-            44_100.0f,
-            1,
-            16,
-            "PCM_SIGNED",
-            false,
-            2,
-            13_230,
-            "WAVE"
+    private static final AudioMetadata METADATA = new AudioMetadata(
+            0.3, 44_100.0f, 1, 16,
+            "PCM_SIGNED", false, 2, 13_230, "WAVE"
     );
 
     @TempDir
@@ -49,129 +42,92 @@ class SoundCatalogServiceTest {
 
 
     @Test
-    @DisplayName("Should recursively find WAV files")
-    void shouldRecursivelyFindWavFiles() throws Exception {
+    @DisplayName("Should recursively find supported audio files")
+    void shouldRecursivelyFindSupportedAudioFiles() throws Exception {
 
         var nestedDirectory = Files.createDirectories(tempDir.resolve("nested"));
-        var firstFile = Files.createFile(tempDir.resolve("first.wav"));
-        var secondFile = Files.createFile(nestedDirectory.resolve("second.WAV"));
+        var wavFile = Files.createFile(tempDir.resolve("first.WAV"));
+        var oggFile = Files.createFile(nestedDirectory.resolve("second.OGG"));
 
         Files.createFile(tempDir.resolve("ignore.txt"));
 
-        when(audioAnalyzer.analyze(firstFile)).thenReturn(metadata);
-        when(audioAnalyzer.analyze(secondFile)).thenReturn(metadata);
+        when(audioAnalyzer.analyze(wavFile)).thenReturn(METADATA);
+        when(audioAnalyzer.analyze(oggFile)).thenReturn(METADATA);
 
         var result = service.load(tempDir);
 
-        assertAll(
-                () -> assertThat(result.entries()).hasSize(2),
-                () -> assertThat(result.entries())
-                        .extracting(SoundEntry::filename)
-                        .containsExactly("first.wav", "second.WAV"),
-                () -> assertThat(result.errors()).isEmpty(),
-                () -> assertThat(result.oggFiles()).isEmpty(),
-                () -> verify(audioAnalyzer).analyze(firstFile),
-                () -> verify(audioAnalyzer).analyze(secondFile)
-        );
+        assertThat(result.entries())
+                .extracting(SoundEntry::filename)
+                .containsExactly("first.WAV", "second.OGG");
+
+        assertThat(result.errors()).isEmpty();
     }
 
 
     @Test
-    @DisplayName("Should preserve analyzed metadata")
-    void shouldPreserveAnalyzedMetadata() throws Exception {
-
-        var file = Files.createFile(tempDir.resolve("sound.wav"));
-
-        when(audioAnalyzer.analyze(file)).thenReturn(metadata);
-
-        var result = service.load(tempDir).entries().getFirst();
-
-        assertAll(
-                () -> assertThat(result.path()).isEqualTo(file),
-                () -> assertThat(result.relativePath()).isEqualTo(Path.of("sound.wav")),
-                () -> assertThat(result.filename()).isEqualTo("sound.wav"),
-                () -> assertThat(result.sizeBytes()).isZero(),
-                () -> assertThat(result.metadata()).isSameAs(metadata)
-        );
-    }
-
-
-    @Test
-    @DisplayName("Should preserve relative file path")
-    void shouldPreserveRelativeFilePath() throws Exception {
+    @DisplayName("Should create sound entry from analyzed file")
+    void shouldCreateSoundEntryFromAnalyzedFile() throws Exception {
 
         var directory = Files.createDirectories(tempDir.resolve(Path.of("ui", "menu")));
-        var file = Files.createFile(directory.resolve("click.wav"));
+        var file = Files.write(directory.resolve("click.ogg"), new byte[]{1, 2, 3});
 
-        when(audioAnalyzer.analyze(file)).thenReturn(metadata);
+        when(audioAnalyzer.analyze(file)).thenReturn(METADATA);
 
-        var result = service.load(tempDir).entries().getFirst();
+        var entry = service.load(tempDir).entries().getFirst();
 
-        assertThat(result.relativePath()).isEqualTo(Path.of("ui", "menu", "click.wav"));
+        assertThat(entry).isEqualTo(new SoundEntry(file, Path.of("ui", "menu", "click.ogg"), "click.ogg", 3L, METADATA));
     }
 
 
-    @Test
-    @DisplayName("Should collect OGG files without treating them as errors")
-    void shouldCollectOggFilesWithoutTreatingThemAsErrors() throws Exception {
+    @ParameterizedTest(name = "[{index}] {0}")
+    @DisplayName("Should collect unsupported audio error and continue scanning")
+    @CsvSource({
+            "broken.wav, WAV",
+            "broken.ogg, OGG"
+    })
+    void shouldCollectUnsupportedAudioError(String filename, AudioFileType fileType) throws Exception {
 
-        var nestedDirectory = Files.createDirectories(tempDir.resolve("nested"));
-        var firstOgg = Files.createFile(tempDir.resolve("first.ogg"));
-        var secondOgg = Files.createFile(nestedDirectory.resolve("second.OGG"));
-
-        var result = service.load(tempDir);
-
-        assertAll(
-                () -> assertThat(result.entries()).isEmpty(),
-                () -> assertThat(result.errors()).isEmpty(),
-                () -> assertThat(result.oggFiles()).containsExactly(firstOgg, secondOgg),
-                () -> verifyNoInteractions(audioAnalyzer)
-        );
-    }
-
-
-    @Test
-    @DisplayName("Should continue scanning when WAV format is unsupported")
-    void shouldContinueScanningWhenWavFormatIsUnsupported() throws Exception {
-
-        var brokenFile = Files.createFile(tempDir.resolve("broken.wav"));
+        var brokenFile = Files.createFile(tempDir.resolve(filename));
         var validFile = Files.createFile(tempDir.resolve("valid.wav"));
 
-        when(audioAnalyzer.analyze(brokenFile)).thenThrow(new UnsupportedAudioFileException("Invalid WAV"));
-        when(audioAnalyzer.analyze(validFile)).thenReturn(metadata);
+        when(audioAnalyzer.analyze(brokenFile))
+                .thenThrow(new UnsupportedAudioFileException("Invalid audio"));
+
+        when(audioAnalyzer.analyze(validFile)).thenReturn(METADATA);
 
         var result = service.load(tempDir);
-        var error = result.errors().getFirst();
 
-        assertAll(
-                () -> assertThat(result.entries()).hasSize(1),
-                () -> assertThat(result.entries().getFirst().filename()).isEqualTo("valid.wav"),
-                () -> assertThat(result.errors()).hasSize(1),
-                () -> assertThat(error.file()).isEqualTo(brokenFile),
-                () -> assertThat(error.type()).isEqualTo(CatalogError.Type.UNSUPPORTED_AUDIO),
-                () -> assertThat(error.message()).isEqualTo("Invalid WAV")
-        );
+        assertThat(result.entries())
+                .extracting(SoundEntry::filename)
+                .containsExactly("valid.wav");
+
+        assertThat(result.errors()).containsExactly(new CatalogError(
+                brokenFile,
+                fileType,
+                CatalogError.Type.UNSUPPORTED_AUDIO,
+                "Invalid audio"
+        ));
     }
 
 
     @Test
-    @DisplayName("Should classify unreadable WAV file")
-    void shouldClassifyUnreadableWavFile() throws Exception {
+    @DisplayName("Should collect unreadable audio error")
+    void shouldCollectUnreadableAudioError() throws Exception {
 
-        var file = Files.createFile(tempDir.resolve("unreadable.wav"));
+        var file = Files.createFile(tempDir.resolve("unreadable.ogg"));
 
         when(audioAnalyzer.analyze(file)).thenThrow(new IOException("Cannot read file"));
 
         var result = service.load(tempDir);
-        var error = result.errors().getFirst();
 
-        assertAll(
-                () -> assertThat(result.entries()).isEmpty(),
-                () -> assertThat(result.errors()).hasSize(1),
-                () -> assertThat(error.file()).isEqualTo(file),
-                () -> assertThat(error.type()).isEqualTo(CatalogError.Type.FILE_UNREADABLE),
-                () -> assertThat(error.message()).isEqualTo("Cannot read file")
-        );
+        assertThat(result.entries()).isEmpty();
+
+        assertThat(result.errors()).containsExactly(new CatalogError(
+                file,
+                AudioFileType.OGG,
+                CatalogError.Type.FILE_UNREADABLE,
+                "Cannot read file"
+        ));
     }
 
 

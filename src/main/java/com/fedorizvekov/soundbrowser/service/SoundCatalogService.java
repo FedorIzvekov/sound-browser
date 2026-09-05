@@ -9,6 +9,7 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.stream.Stream;
 import javax.sound.sampled.UnsupportedAudioFileException;
+import com.fedorizvekov.soundbrowser.model.AudioFileType;
 import com.fedorizvekov.soundbrowser.model.CatalogError;
 import com.fedorizvekov.soundbrowser.model.CatalogResult;
 import com.fedorizvekov.soundbrowser.model.SoundEntry;
@@ -30,14 +31,8 @@ public final class SoundCatalogService {
 
         var entries = new ArrayList<SoundEntry>(audioFiles.size());
         var errors = new ArrayList<CatalogError>();
-        var oggFiles = new ArrayList<Path>();
 
         for (var file : audioFiles) {
-
-            if (isOgg(file)) {
-                oggFiles.add(file);
-                continue;
-            }
 
             try {
 
@@ -54,7 +49,7 @@ public final class SoundCatalogService {
             }
         }
 
-        return new CatalogResult(List.copyOf(entries), List.copyOf(errors), List.copyOf(oggFiles));
+        return new CatalogResult(List.copyOf(entries), List.copyOf(errors));
     }
 
 
@@ -71,7 +66,12 @@ public final class SoundCatalogService {
 
 
     private CatalogError createError(Path file, CatalogError.Type type, Exception exception) {
-        return new CatalogError(file, type, formatErrorMessage(exception));
+        return new CatalogError(file, resolveFileType(file), type, formatErrorMessage(exception));
+    }
+
+
+    private AudioFileType resolveFileType(Path file) {
+        return isOgg(file) ? AudioFileType.OGG : AudioFileType.WAV;
     }
 
 

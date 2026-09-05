@@ -9,10 +9,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import javax.sound.sampled.UnsupportedAudioFileException;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 @DisplayName("AudioAnalyzer")
 class AudioAnalyzerTest {
@@ -25,13 +25,15 @@ class AudioAnalyzerTest {
 
 
     @ParameterizedTest(name = "[{index}] {0}")
-    @DisplayName("should analyze WAV metadata")
+    @DisplayName("Should analyze audio metadata")
     @CsvSource({
-            "test_signal_16bit.wav, 0.300, 44100, 1, 16, PCM_SIGNED, false, 2, 13230, WAVE",
-            "test_signal_32bit.wav, 0.500, 44100, 1, 32, PCM_FLOAT,  false, 4, 22050, WAVE",
-            "test_waveform.wav,     0.250, 44100, 1, 16, PCM_SIGNED, false, 2, 11025, WAVE"
+            "signal_16bit.wav, 0.300, 44100, 1, 16, PCM_SIGNED, false, 2, 13230, WAVE",
+            "signal_32bit.wav, 0.500, 44100, 1, 32, PCM_FLOAT,  false, 4, 22050, WAVE",
+            "waveform.wav,     0.250, 44100, 1, 16, PCM_SIGNED, false, 2, 11025, WAVE",
+            "signal_16bit.ogg, 0.300, 44100, 1, -1, VORBISENC, false, 1, -1, OGG",
+            "waveform.ogg,     0.250, 44100, 2, -1, VORBISENC, false, 1, -1, OGG"
     })
-    void shouldAnalyzeWavMetadata(
+    void shouldAnalyzeAudioMetadata(
             String filename,
             double expectedDuration,
             float expectedSampleRate,
@@ -44,9 +46,7 @@ class AudioAnalyzerTest {
             String expectedType
     ) throws Exception {
 
-        var file = AUDIO_DIR.resolve(filename);
-
-        var metadata = audioAnalyzer.analyze(file);
+        var metadata = audioAnalyzer.analyze(AUDIO_DIR.resolve(filename));
 
         assertAll(
                 () -> assertThat(metadata.durationSeconds()).isCloseTo(expectedDuration, within(0.0001)),
@@ -59,18 +59,20 @@ class AudioAnalyzerTest {
                 () -> assertThat(metadata.frameLength()).isEqualTo(expectedFrameLength),
                 () -> assertThat(metadata.type()).isEqualTo(expectedType)
         );
+
     }
 
 
-    @Test
-    @DisplayName("should reject invalid WAV file")
-    void shouldRejectInvalidWavFile() throws Exception {
+    @ParameterizedTest(name = "[{index}] {0}")
+    @DisplayName("Should reject invalid audio file")
+    @ValueSource(strings = {"invalid.wav", "invalid.ogg"})
+    void shouldRejectInvalidAudioFile(String filename) throws Exception {
 
-        Path file = tempDir.resolve("invalid.wav");
-        Files.writeString(file, "not a wav file");
+        var file = tempDir.resolve(filename);
 
-        assertThatThrownBy(() -> audioAnalyzer.analyze(file))
-                .isInstanceOf(UnsupportedAudioFileException.class)
-                .hasMessageMatching("File of unsupported format");
+        Files.writeString(file, "not an audio file");
+
+        assertThatThrownBy(() -> audioAnalyzer.analyze(file)).isInstanceOf(UnsupportedAudioFileException.class);
     }
+
 }

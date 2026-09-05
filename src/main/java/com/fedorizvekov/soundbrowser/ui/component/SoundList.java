@@ -20,7 +20,7 @@ public final class SoundList extends ListView<SoundEntry> {
     public SoundList(ObservableList<SoundEntry> sounds, AudioPlayer audioPlayer, WaveformService waveformService) {
 
         setItems(sounds);
-        setPlaceholder(new Label("Select a directory containing WAV files"));
+        setPlaceholder(new Label("Select a directory containing audio files"));
         setCellFactory(list -> new SoundListCell(audioPlayer, waveformService));
         getStyleClass().add("sound-list");
     }

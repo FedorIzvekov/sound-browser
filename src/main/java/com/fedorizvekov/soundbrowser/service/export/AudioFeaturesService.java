@@ -5,9 +5,9 @@ import java.nio.file.Path;
 import java.util.Optional;
 import javax.sound.sampled.AudioFormat;
 import javax.sound.sampled.AudioInputStream;
-import javax.sound.sampled.AudioSystem;
 import javax.sound.sampled.UnsupportedAudioFileException;
 import com.fedorizvekov.soundbrowser.model.export.AudioFeatures;
+import com.fedorizvekov.soundbrowser.service.AudioDecoder;
 
 public final class AudioFeaturesService {
 
@@ -18,27 +18,29 @@ public final class AudioFeaturesService {
     private static final double SILENCE_THRESHOLD = Math.pow(10.0, SILENCE_THRESHOLD_DBFS / 20.0);
     private static final double SILENCE_WINDOW_SECONDS = 0.01;
 
+    private final AudioDecoder audioDecoder;
     private final int envelopePoints;
 
 
-    public AudioFeaturesService() {
-        this(DEFAULT_ENVELOPE_POINTS);
+    public AudioFeaturesService(AudioDecoder audioDecoder) {
+        this(audioDecoder, DEFAULT_ENVELOPE_POINTS);
     }
 
 
-    public AudioFeaturesService(int envelopePoints) {
+    public AudioFeaturesService(AudioDecoder audioDecoder, int envelopePoints) {
 
         if (envelopePoints <= 0) {
             throw new IllegalArgumentException("Envelope points must be greater than zero");
         }
 
+        this.audioDecoder = audioDecoder;
         this.envelopePoints = envelopePoints;
     }
 
 
     public Optional<AudioFeatures> analyze(Path file) {
 
-        try (var stream = AudioSystem.getAudioInputStream(file.toFile())) {
+        try (var stream = audioDecoder.open(file)) {
 
             var format = stream.getFormat();
 
@@ -157,7 +159,7 @@ public final class AudioFeaturesService {
             }
         }
 
-        if (frameIndex != totalFrames || sampleCount == 0) {
+        if (sampleCount == 0) {
             return Optional.empty();
         }
 

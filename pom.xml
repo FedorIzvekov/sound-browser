@@ -6,7 +6,7 @@
 
     <groupId>com.fedorizvekov</groupId>
     <artifactId>sound-browser</artifactId>
-    <version>1.0.14</version>
+    <version>1.0.15</version>
 
     <name>Sound Browser</name>
 
@@ -17,6 +17,7 @@
         <mainClass>com.fedorizvekov.soundbrowser.SoundBrowser</mainClass>
 
         <javafx.version>26.0.1</javafx.version>
+        <vorbisspi.version>2024.04.19</vorbisspi.version>
         <jackson.version>2.22.2</jackson.version>
 
         <junit.version>6.1.3</junit.version>
@@ -35,6 +36,12 @@
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-controls</artifactId>
             <version>${javafx.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>dev.mccue</groupId>
+            <artifactId>vorbisspi</artifactId>
+            <version>${vorbisspi.version}</version>
         </dependency>
 
         <dependency>

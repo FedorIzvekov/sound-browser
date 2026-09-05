@@ -1,18 +1,23 @@
-# Sound Browser v1.0.14
-A desktop application for browsing, previewing, filtering, and analyzing sound effects in a selected directory.
+# Sound Browser v1.0.15
+
+A desktop application designed to help game developers quickly browse, preview, analyze, and select audio content from large sound libraries.
+
+Sound Browser makes it easier to explore large collections of sound effects, find suitable assets, preview them without switching between applications, and prepare structured audio data for AI-assisted analysis without uploading the original audio files.
+
+<img src="/.img/browser.png" alt="Sound Browser" width="500">
 
 ## ✨ Features
 
-- Recursively scans a selected directory for WAV sound effects.
-- Displays duration, sample rate, channel count, bit depth, encoding, and file size.
-- Generates waveform previews for easier sound effect selection.
-- Plays included sound effects sequentially from the current search results.
-- Allows sounds to be manually included in or excluded from playback and export.
-- Exports selected sounds to JSONL with metadata, audio features, and compact amplitude envelopes.
+* Recursively scans selected directories for supported audio files, including WAV and OGG.
+* Displays duration, sample rate, channel count, bit depth, encoding, and file size.
+* Generates waveform previews for easier sound selection.
+* Plays sound effects directly from the current search results.
+* Allows sounds to be manually included in or excluded from playback and export.
+* Exports selected sounds to JSONL with metadata, audio features, and compact amplitude envelopes, making large sound libraries easier to analyze with AI without uploading the original audio files.
 
 ## ⚙️ Requirements
 
-- Java 25 LTS
+* Java 25 LTS
 
 ## ▶️ Run
 
@@ -34,12 +39,12 @@ A desktop application for browsing, previewing, filtering, and analyzing sound e
 
 ```bash
 ./mvnw clean package
-java -jar target/sound-browser-1.0.14.jar
+java -jar target/sound-browser-1.0.15.jar
 ```
 
 ### Windows
 
 ```powershell
 .\mvnw.cmd clean package
-java -jar target\sound-browser-1.0.14.jar
+java -jar target\sound-browser-1.0.15.jar
 ```

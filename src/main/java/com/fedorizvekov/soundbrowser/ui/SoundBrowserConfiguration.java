@@ -3,6 +3,7 @@ package com.fedorizvekov.soundbrowser.ui;
 import static java.util.Objects.requireNonNull;
 
 import com.fedorizvekov.soundbrowser.service.AudioAnalyzer;
+import com.fedorizvekov.soundbrowser.service.AudioDecoder;
 import com.fedorizvekov.soundbrowser.service.AudioPlayer;
 import com.fedorizvekov.soundbrowser.service.SoundCatalogService;
 import com.fedorizvekov.soundbrowser.service.WaveformService;
@@ -25,10 +26,11 @@ public final class SoundBrowserConfiguration extends Application {
 
         var analyzer = new AudioAnalyzer();
         var catalogService = new SoundCatalogService(analyzer);
-        var audioPlayer = new AudioPlayer();
-        var waveformService = new WaveformService();
 
-        var audioFeaturesService = new AudioFeaturesService();
+        var audioDecoder = new AudioDecoder();
+        var audioPlayer = new AudioPlayer(audioDecoder);
+        var waveformService = new WaveformService(audioDecoder);
+        var audioFeaturesService = new AudioFeaturesService(audioDecoder);
         var jsonlExportService = new JsonlExportService(audioFeaturesService);
 
         var view = new SoundBrowserView(catalogService, jsonlExportService, audioPlayer, waveformService);
@@ -41,9 +43,11 @@ public final class SoundBrowserConfiguration extends Application {
         scene.getStylesheets().add(requireNonNull(SoundBrowserConfiguration.class.getResource("/styles/waveform.css")).toExternalForm());
 
         stage.setScene(scene);
-        stage.setTitle("SFX Browser");
+        stage.setTitle("Sound Browser");
         stage.setMinWidth(MINIMUM_WIDTH);
         stage.setMinHeight(MINIMUM_HEIGHT);
+        stage.setOnCloseRequest(event -> audioPlayer.close());
         stage.show();
     }
+
 }

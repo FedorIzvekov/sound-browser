@@ -6,6 +6,8 @@ import java.util.List;
 import java.util.Locale;
 import javax.sound.sampled.LineUnavailableException;
 import javax.sound.sampled.UnsupportedAudioFileException;
+import com.fedorizvekov.soundbrowser.model.AudioFileType;
+import com.fedorizvekov.soundbrowser.model.CatalogError;
 import com.fedorizvekov.soundbrowser.model.CatalogResult;
 import com.fedorizvekov.soundbrowser.model.SoundEntry;
 import com.fedorizvekov.soundbrowser.model.export.JsonlExportResult;
@@ -44,7 +46,6 @@ public final class SoundBrowserView extends BorderPane {
     private final SoundList soundList;
 
     private int errorCount;
-    private int oggCount;
 
     private boolean loading;
     private boolean exporting;
@@ -159,7 +160,6 @@ public final class SoundBrowserView extends BorderPane {
         soundList.resetInclusion();
 
         errorCount = 0;
-        oggCount = 0;
 
         statusView.showInfo("Scanning audio files...");
         updateState();
@@ -184,18 +184,17 @@ public final class SoundBrowserView extends BorderPane {
     private void applyCatalogResult(CatalogResult result) {
 
         errorCount = result.errors().size();
-        oggCount = result.oggFiles().size();
 
         sounds.setAll(result.entries());
 
         setLoading(false);
 
-        if (errorCount == 0) {
+        if (result.errors().isEmpty()) {
             statusView.clearStatus();
             return;
         }
 
-        statusView.showWarning(formatSkippedFiles(errorCount));
+        statusView.showWarning(formatSkippedFiles(result.errors()));
     }
 
 
@@ -203,7 +202,6 @@ public final class SoundBrowserView extends BorderPane {
 
         sounds.clear();
         errorCount = 0;
-        oggCount = 0;
 
         setLoading(false);
 
@@ -302,7 +300,7 @@ public final class SoundBrowserView extends BorderPane {
 
     private void updateState() {
 
-        statusView.updateCounts(filteredSounds.size(), sounds.size(), errorCount, oggCount);
+        statusView.updateCounts(filteredSounds.size(), sounds.size() + errorCount, errorCount);
 
         header.setHasSounds(!sounds.isEmpty());
         header.setExportAvailable(!filteredSounds.isEmpty());
@@ -325,10 +323,41 @@ public final class SoundBrowserView extends BorderPane {
     }
 
 
-    private String formatSkippedFiles(int count) {
-        return count == 1
-                ? "1 WAV file could not be analyzed"
-                : "%,d WAV files could not be analyzed".formatted(count);
+    private String formatSkippedFiles(List<CatalogError> errors) {
+
+        var wavErrors = errors.stream()
+                .filter(error -> error.fileType() == AudioFileType.WAV)
+                .count();
+
+        var oggErrors = errors.stream()
+                .filter(error -> error.fileType() == AudioFileType.OGG)
+                .count();
+
+        var total = errors.size();
+        var message = new StringBuilder();
+
+        if (total == 1) {
+            message.append("1 audio file could not be analyzed");
+        } else {
+            message.append(total).append(" audio files could not be analyzed");
+        }
+
+        message.append(": ");
+
+        if (wavErrors > 0) {
+            message.append(wavErrors).append(" WAV");
+        }
+
+        if (oggErrors > 0) {
+
+            if (wavErrors > 0) {
+                message.append(", ");
+            }
+
+            message.append(oggErrors).append(" OGG");
+        }
+
+        return message.toString();
     }
 
 

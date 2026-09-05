@@ -2,6 +2,7 @@ package com.fedorizvekov.soundbrowser.ui.component;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import javax.sound.sampled.AudioSystem;
 import javax.sound.sampled.LineUnavailableException;
 import javax.sound.sampled.UnsupportedAudioFileException;
 import com.fedorizvekov.soundbrowser.model.SoundEntry;
@@ -285,14 +286,21 @@ public final class SoundListCell extends ListCell<SoundEntry> {
 
         var metadata = entry.metadata();
 
-        return "%s · %s · %.1f kHz · %s · %d bit · %s".formatted(
+        return "%s · %s · %.1f kHz · %s · %s · %s".formatted(
                 metadata.type(),
                 formatDuration(metadata.durationSeconds()),
                 metadata.sampleRate() / 1_000.0,
                 formatChannels(metadata.channels()),
-                metadata.sampleSizeBits(),
+                formatSampleSize(metadata.sampleSizeBits()),
                 formatSize(entry.sizeBytes())
         );
+    }
+
+
+    private String formatSampleSize(int bits) {
+        return bits == AudioSystem.NOT_SPECIFIED
+                ? "Compressed"
+                : bits + " bit";
     }
 
 
