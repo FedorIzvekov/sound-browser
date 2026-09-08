@@ -7,6 +7,7 @@ import java.util.Locale;
 import javax.sound.sampled.LineUnavailableException;
 import javax.sound.sampled.UnsupportedAudioFileException;
 import com.fedorizvekov.soundbrowser.model.AudioFileType;
+import com.fedorizvekov.soundbrowser.model.AudioFormatFilter;
 import com.fedorizvekov.soundbrowser.model.CatalogError;
 import com.fedorizvekov.soundbrowser.model.CatalogResult;
 import com.fedorizvekov.soundbrowser.model.SoundEntry;
@@ -41,10 +42,11 @@ public final class SoundBrowserView extends BorderPane {
     private final FilteredList<SoundEntry> filteredSounds = new FilteredList<>(sounds);
 
     private final BrowserHeader header = new BrowserHeader();
-    private final CatalogStatus statusView = new CatalogStatus();
+    private final CatalogStatus statusView = new CatalogStatus(header.getFormatSwitch());
     private final SoundListHeader soundListHeader = new SoundListHeader();
     private final SoundList soundList;
 
+    private Path currentDirectory;
     private int errorCount;
 
     private boolean loading;
@@ -84,9 +86,11 @@ public final class SoundBrowserView extends BorderPane {
 
 
     private void configureActions() {
+
         header.setOnOpenDirectory(this::selectDirectory);
         header.setOnExportJsonl(this::selectExportTarget);
         header.setOnSearch(this::filterSounds);
+        header.setOnFormatChanged(this::changeFormatFilter);
 
         audioPlayer.setOnPlaybackFinished(file -> Platform.runLater(() -> handlePlaybackFinished(file)));
 
@@ -148,30 +152,46 @@ public final class SoundBrowserView extends BorderPane {
     }
 
 
+    private void changeFormatFilter(AudioFormatFilter formatFilter) {
+
+        if (currentDirectory != null && !loading && !exporting) {
+            loadDirectory(currentDirectory);
+        }
+    }
+
+
     private void loadDirectory(Path directory) {
+
+        var root = directory.toAbsolutePath().normalize();
+        var directoryChanged = !root.equals(currentDirectory);
+        var formatFilter = header.getFormatFilter();
+
+        currentDirectory = root;
 
         audioPlayer.stop();
         setLoading(true);
 
-        header.setDirectory(directory);
-        header.clearSearch();
+        header.setDirectory(root);
 
-        sounds.clear();
-        soundList.resetInclusion();
+        if (directoryChanged) {
+            header.clearSearch();
+            soundList.resetInclusion();
+        }
 
         errorCount = 0;
+        sounds.clear();
 
         statusView.showInfo("Scanning audio files...");
         updateState();
 
-        Thread.ofVirtual().name("sound-catalog-loader").start(() -> loadCatalog(directory));
+        Thread.ofVirtual().name("sound-catalog-loader").start(() -> loadCatalog(root, formatFilter));
     }
 
 
-    private void loadCatalog(Path directory) {
+    private void loadCatalog(Path directory, AudioFormatFilter formatFilter) {
 
         try {
-            var result = soundCatalogService.load(directory);
+            var result = soundCatalogService.load(directory, formatFilter);
 
             Platform.runLater(() -> applyCatalogResult(result));
 
@@ -216,6 +236,7 @@ public final class SoundBrowserView extends BorderPane {
         var normalizedQuery = normalize(query);
 
         filteredSounds.setPredicate(entry -> {
+
             if (normalizedQuery.isEmpty()) {
                 return true;
             }
@@ -389,4 +410,5 @@ public final class SoundBrowserView extends BorderPane {
 
         return file.resolveSibling(filename + ".jsonl");
     }
+
 }

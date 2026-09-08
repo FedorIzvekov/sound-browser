@@ -1,0 +1,37 @@
+.audio-format-switch .audio-format-button {
+    -fx-background-color: #f0f1f3;
+    -fx-text-fill: #4b5563;
+    -fx-background-radius: 0;
+    -fx-background-insets: 0;
+    -fx-border-color: #d4d7dc;
+    -fx-border-width: 1;
+    -fx-border-radius: 0;
+    -fx-padding: 4 12;
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+    -fx-cursor: hand;
+}
+
+.audio-format-switch .audio-format-button.format-first {
+    -fx-background-radius: 6 0 0 6;
+    -fx-border-radius: 6 0 0 6;
+}
+
+.audio-format-switch .audio-format-button.format-last {
+    -fx-background-radius: 0 6 6 0;
+    -fx-border-radius: 0 6 6 0;
+}
+
+.audio-format-switch .audio-format-button:hover {
+    -fx-background-color: #fff0e5;
+}
+
+.audio-format-switch .audio-format-button:selected {
+    -fx-background-color: #ff7a18;
+    -fx-border-color: #ff7a18;
+    -fx-text-fill: #202020;
+}
+
+.audio-format-switch .audio-format-button:focused {
+    -fx-border-color: #9a4000;
+}

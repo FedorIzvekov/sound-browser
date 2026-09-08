@@ -1,8 +1,11 @@
 package com.fedorizvekov.soundbrowser.ui.component;
 
 import javafx.geometry.Pos;
+import javafx.scene.Node;
 import javafx.scene.control.Label;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 
 public final class CatalogStatus extends VBox {
@@ -17,7 +20,7 @@ public final class CatalogStatus extends VBox {
     private final Label statusLabel = new Label();
 
 
-    public CatalogStatus() {
+    public CatalogStatus(Node formatSwitch) {
 
         super(12);
 
@@ -31,13 +34,27 @@ public final class CatalogStatus extends VBox {
         );
 
         countBar.setAlignment(Pos.CENTER_LEFT);
-        countBar.setMaxWidth(Double.MAX_VALUE);
+        countBar.setMinWidth(Region.USE_PREF_SIZE);
 
-        getChildren().addAll(countBar, statusLabel);
+        var spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+
+        var summaryBar = new HBox(
+                12,
+                countBar,
+                spacer,
+                formatSwitch
+        );
+
+        summaryBar.setAlignment(Pos.CENTER_LEFT);
+        summaryBar.setMaxWidth(Double.MAX_VALUE);
+
+        getChildren().addAll(summaryBar, statusLabel);
     }
 
 
     public void updateCounts(int found, int total, int errors) {
+
         foundCountLabel.setText("%,d found".formatted(found));
         totalCountLabel.setText("%,d total".formatted(total));
         errorCountLabel.setText(formatErrorCount(errors));
@@ -73,6 +90,7 @@ public final class CatalogStatus extends VBox {
 
 
     private void configureLabels() {
+
         foundCountLabel.getStyleClass().addAll("count-label", "found-count-label");
         totalCountLabel.getStyleClass().addAll("count-label", "total-count-label");
         errorCountLabel.getStyleClass().addAll("count-label", "error-count-label");
@@ -84,6 +102,7 @@ public final class CatalogStatus extends VBox {
 
 
     private void showStatus(String text, String additionalStyleClass) {
+
         statusLabel.setText(text);
 
         statusLabel.getStyleClass().removeAll(STATUS_SUCCESS_STYLE, STATUS_WARNING_STYLE, STATUS_ERROR_STYLE);

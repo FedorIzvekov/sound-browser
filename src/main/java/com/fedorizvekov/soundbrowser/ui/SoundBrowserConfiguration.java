@@ -1,7 +1,5 @@
 package com.fedorizvekov.soundbrowser.ui;
 
-import static java.util.Objects.requireNonNull;
-
 import com.fedorizvekov.soundbrowser.service.AudioAnalyzer;
 import com.fedorizvekov.soundbrowser.service.AudioDecoder;
 import com.fedorizvekov.soundbrowser.service.AudioPlayer;
@@ -37,10 +35,11 @@ public final class SoundBrowserConfiguration extends Application {
 
         var scene = new Scene(view, INITIAL_WIDTH, INITIAL_HEIGHT);
 
-        scene.getStylesheets().add(requireNonNull(SoundBrowserConfiguration.class.getResource("/styles/sound-browser.css")).toExternalForm());
-        scene.getStylesheets().add(requireNonNull(SoundBrowserConfiguration.class.getResource("/styles/list.css")).toExternalForm());
-        scene.getStylesheets().add(requireNonNull(SoundBrowserConfiguration.class.getResource("/styles/player.css")).toExternalForm());
-        scene.getStylesheets().add(requireNonNull(SoundBrowserConfiguration.class.getResource("/styles/waveform.css")).toExternalForm());
+        scene.getStylesheets().add(SoundBrowserConfiguration.class.getResource("/styles/sound-browser.css").toExternalForm());
+        scene.getStylesheets().add(SoundBrowserConfiguration.class.getResource("/styles/audio-filter.css").toExternalForm());
+        scene.getStylesheets().add(SoundBrowserConfiguration.class.getResource("/styles/list.css").toExternalForm());
+        scene.getStylesheets().add(SoundBrowserConfiguration.class.getResource("/styles/player.css").toExternalForm());
+        scene.getStylesheets().add(SoundBrowserConfiguration.class.getResource("/styles/waveform.css").toExternalForm());
 
         stage.setScene(scene);
         stage.setTitle("Sound Browser");

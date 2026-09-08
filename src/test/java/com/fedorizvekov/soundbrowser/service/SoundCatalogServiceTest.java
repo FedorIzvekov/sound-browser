@@ -2,6 +2,9 @@ package com.fedorizvekov.soundbrowser.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertAll;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
@@ -9,6 +12,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import javax.sound.sampled.UnsupportedAudioFileException;
 import com.fedorizvekov.soundbrowser.model.AudioFileType;
+import com.fedorizvekov.soundbrowser.model.AudioFormatFilter;
 import com.fedorizvekov.soundbrowser.model.AudioMetadata;
 import com.fedorizvekov.soundbrowser.model.CatalogError;
 import com.fedorizvekov.soundbrowser.model.SoundEntry;
@@ -61,6 +65,86 @@ class SoundCatalogServiceTest {
                 .containsExactly("first.WAV", "second.OGG");
 
         assertThat(result.errors()).isEmpty();
+    }
+
+
+    @ParameterizedTest(name = "[{index}] {0}")
+    @DisplayName("Should analyze only enabled audio formats")
+    @CsvSource({
+            "WAV_ONLY,    true,  false",
+            "WAV_AND_OGG, true,  true",
+            "OGG_ONLY,    false, true"
+    })
+    void shouldAnalyzeOnlyEnabledAudioFormats(AudioFormatFilter formatFilter, boolean includeWav, boolean includeOgg) throws Exception {
+
+        var nestedDirectory = Files.createDirectories(tempDir.resolve("nested"));
+        var wavFile = Files.createFile(tempDir.resolve("first.WAV"));
+        var oggFile = Files.createFile(nestedDirectory.resolve("second.OGG"));
+
+        Files.createFile(tempDir.resolve("ignore.txt"));
+        Files.createFile(tempDir.resolve("ignore.wav.bak"));
+
+        if (includeWav) {
+            when(audioAnalyzer.analyze(wavFile)).thenReturn(METADATA);
+        }
+
+        if (includeOgg) {
+            when(audioAnalyzer.analyze(oggFile)).thenReturn(METADATA);
+        }
+
+        var expectedFiles = switch (formatFilter) {
+            case WAV_ONLY -> new Path[]{wavFile};
+            case WAV_AND_OGG -> new Path[]{wavFile, oggFile};
+            case OGG_ONLY -> new Path[]{oggFile};
+        };
+
+        var result = service.load(tempDir, formatFilter);
+
+        assertThat(result.entries())
+                .extracting(SoundEntry::path)
+                .containsExactly(expectedFiles);
+
+        assertThat(result.errors()).isEmpty();
+
+        for (var file : expectedFiles) {
+            verify(audioAnalyzer).analyze(file);
+        }
+
+        verifyNoMoreInteractions(audioAnalyzer);
+    }
+
+
+    @ParameterizedTest(name = "[{index}] {0} → {1}")
+    @DisplayName("Should rebuild catalog when audio format filter changes")
+    @CsvSource({
+            "WAV_ONLY, OGG_ONLY, first.wav, second.ogg",
+            "OGG_ONLY, WAV_ONLY, second.ogg, first.wav"
+    })
+    void shouldRebuildCatalogWhenAudioFormatFilterChanges(AudioFormatFilter initialFilter, AudioFormatFilter nextFilter, String initialFilename, String nextFilename) throws Exception {
+
+        var initialFile = Files.createFile(tempDir.resolve(initialFilename));
+        var nextFile = Files.createFile(tempDir.resolve(nextFilename));
+
+        when(audioAnalyzer.analyze(initialFile)).thenReturn(METADATA);
+        when(audioAnalyzer.analyze(nextFile)).thenReturn(METADATA);
+
+        var initialResult = service.load(tempDir, initialFilter);
+        var nextResult = service.load(tempDir, nextFilter);
+
+        assertAll(
+                () -> assertThat(initialResult.entries())
+                        .extracting(SoundEntry::path)
+                        .containsExactly(initialFile),
+                () -> assertThat(nextResult.entries())
+                        .extracting(SoundEntry::path)
+                        .containsExactly(nextFile),
+                () -> assertThat(initialResult.errors()).isEmpty(),
+                () -> assertThat(nextResult.errors()).isEmpty()
+        );
+
+        verify(audioAnalyzer).analyze(initialFile);
+        verify(audioAnalyzer).analyze(nextFile);
+        verifyNoMoreInteractions(audioAnalyzer);
     }
 
 

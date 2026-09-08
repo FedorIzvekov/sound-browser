@@ -2,12 +2,15 @@ package com.fedorizvekov.soundbrowser.ui.component;
 
 import java.nio.file.Path;
 import java.util.function.Consumer;
+import com.fedorizvekov.soundbrowser.model.AudioFormatFilter;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.OverrunStyle;
 import javafx.scene.control.ProgressIndicator;
 import javafx.scene.control.TextField;
+import javafx.scene.control.ToggleButton;
+import javafx.scene.control.ToggleGroup;
 import javafx.scene.control.Tooltip;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
@@ -20,6 +23,10 @@ public final class BrowserHeader extends VBox {
     private final Label directoryLabel = new Label("No directory selected");
     private final TextField searchField = new TextField();
     private final ProgressIndicator progressIndicator = new ProgressIndicator();
+    private final ToggleGroup formatGroup = new ToggleGroup();
+    private final HBox formatSwitch = new HBox();
+
+    private Consumer<AudioFormatFilter> onFormatChanged = formatFilter -> {};
 
     private boolean loading;
     private boolean exporting;
@@ -27,10 +34,12 @@ public final class BrowserHeader extends VBox {
     private boolean exportAvailable;
     private boolean directorySelected;
 
+
     public BrowserHeader() {
 
         super(12);
 
+        configureFormatSwitch();
         configureControls();
 
         var titleLabel = new Label("Sound Library");
@@ -50,7 +59,13 @@ public final class BrowserHeader extends VBox {
         );
 
         toolbar.setAlignment(Pos.CENTER_LEFT);
+
         getChildren().addAll(toolbar, searchField);
+    }
+
+
+    public HBox getFormatSwitch() {
+        return formatSwitch;
     }
 
 
@@ -69,7 +84,18 @@ public final class BrowserHeader extends VBox {
     }
 
 
+    public void setOnFormatChanged(Consumer<AudioFormatFilter> action) {
+        onFormatChanged = action;
+    }
+
+
+    public AudioFormatFilter getFormatFilter() {
+        return (AudioFormatFilter) formatGroup.getSelectedToggle().getUserData();
+    }
+
+
     public void setDirectory(Path directory) {
+
         var path = directory.toString();
 
         directorySelected = true;
@@ -110,6 +136,49 @@ public final class BrowserHeader extends VBox {
     }
 
 
+    private void configureFormatSwitch() {
+
+        var wavOnly = createFormatButton("WAV", AudioFormatFilter.WAV_ONLY);
+        var wavAndOgg = createFormatButton("WAV + OGG", AudioFormatFilter.WAV_AND_OGG);
+        var oggOnly = createFormatButton("OGG", AudioFormatFilter.OGG_ONLY);
+
+        wavOnly.getStyleClass().add("format-first");
+        oggOnly.getStyleClass().add("format-last");
+
+        formatSwitch.getStyleClass().add("audio-format-switch");
+        formatSwitch.setAlignment(Pos.CENTER_RIGHT);
+        formatSwitch.setMinWidth(HBox.USE_PREF_SIZE);
+        formatSwitch.getChildren().addAll(wavOnly, wavAndOgg, oggOnly);
+
+        formatGroup.selectToggle(wavAndOgg);
+
+        formatGroup.selectedToggleProperty().addListener((observable, oldToggle, newToggle) -> {
+
+            if (newToggle == null) {
+                formatGroup.selectToggle(oldToggle);
+                return;
+            }
+
+            if (oldToggle != null) {
+                onFormatChanged.accept((AudioFormatFilter) newToggle.getUserData());
+            }
+        });
+    }
+
+
+    private ToggleButton createFormatButton(String text, AudioFormatFilter formatFilter) {
+
+        var button = new ToggleButton(text);
+
+        button.setToggleGroup(formatGroup);
+        button.setUserData(formatFilter);
+        button.setMinWidth(ToggleButton.USE_PREF_SIZE);
+        button.getStyleClass().add("audio-format-button");
+
+        return button;
+    }
+
+
     private void configureControls() {
 
         openDirectoryButton.getStyleClass().add("primary-button");
@@ -136,8 +205,9 @@ public final class BrowserHeader extends VBox {
         var busy = loading || exporting;
 
         openDirectoryButton.setDisable(busy);
-        searchField.setDisable(busy || !hasSounds);
-        exportJsonlButton.setDisable(busy || !exportAvailable);
+        formatSwitch.setDisable(busy);
+        searchField.setDisable(busy || !directorySelected);
+        exportJsonlButton.setDisable(busy || !hasSounds || !exportAvailable);
 
         exportJsonlButton.setText(exporting ? "Exporting..." : "Export JSONL");
 

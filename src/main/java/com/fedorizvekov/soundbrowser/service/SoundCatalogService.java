@@ -6,10 +6,10 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
-import java.util.Objects;
 import java.util.stream.Stream;
 import javax.sound.sampled.UnsupportedAudioFileException;
 import com.fedorizvekov.soundbrowser.model.AudioFileType;
+import com.fedorizvekov.soundbrowser.model.AudioFormatFilter;
 import com.fedorizvekov.soundbrowser.model.CatalogError;
 import com.fedorizvekov.soundbrowser.model.CatalogResult;
 import com.fedorizvekov.soundbrowser.model.SoundEntry;
@@ -25,9 +25,14 @@ public final class SoundCatalogService {
 
 
     public CatalogResult load(Path directory) throws IOException {
+        return load(directory, AudioFormatFilter.WAV_AND_OGG);
+    }
+
+
+    public CatalogResult load(Path directory, AudioFormatFilter formatFilter) throws IOException {
 
         var root = validateDirectory(directory);
-        var audioFiles = findAudioFiles(root);
+        var audioFiles = findAudioFiles(root, formatFilter);
 
         var entries = new ArrayList<SoundEntry>(audioFiles.size());
         var errors = new ArrayList<CatalogError>();
@@ -54,7 +59,9 @@ public final class SoundCatalogService {
 
 
     private SoundEntry createEntry(Path root, Path file) throws IOException, UnsupportedAudioFileException {
+
         var metadata = audioAnalyzer.analyze(file);
+
         return new SoundEntry(
                 file,
                 root.relativize(file),
@@ -77,8 +84,6 @@ public final class SoundCatalogService {
 
     private Path validateDirectory(Path directory) {
 
-        Objects.requireNonNull(directory, "Directory must not be null");
-
         var root = directory.toAbsolutePath().normalize();
 
         if (!Files.exists(root)) {
@@ -93,12 +98,13 @@ public final class SoundCatalogService {
     }
 
 
-    private List<Path> findAudioFiles(Path root) throws IOException {
+    private List<Path> findAudioFiles(Path root, AudioFormatFilter formatFilter) throws IOException {
 
         try (Stream<Path> stream = Files.walk(root)) {
             return stream
                     .filter(Files::isRegularFile)
                     .filter(path -> isWav(path) || isOgg(path))
+                    .filter(path -> formatFilter.includes(resolveFileType(path)))
                     .sorted()
                     .toList();
         }
