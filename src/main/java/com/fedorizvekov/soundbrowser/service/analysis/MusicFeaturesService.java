@@ -1,4 +1,4 @@
-package com.fedorizvekov.soundbrowser.service.export;
+package com.fedorizvekov.soundbrowser.service.analysis;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -6,28 +6,24 @@ import java.util.Optional;
 import javax.sound.sampled.AudioFormat;
 import javax.sound.sampled.AudioInputStream;
 import javax.sound.sampled.UnsupportedAudioFileException;
-import com.fedorizvekov.soundbrowser.model.export.AudioFeatures;
+import com.fedorizvekov.soundbrowser.model.analysis.MusicFeatures;
 import com.fedorizvekov.soundbrowser.service.AudioDecoder;
 
-public final class AudioFeaturesService {
+public final class MusicFeaturesService {
 
     private static final int DEFAULT_ENVELOPE_POINTS = 64;
     private static final int BUFFER_SIZE = 8192;
-
-    private static final double SILENCE_THRESHOLD_DBFS = -60.0;
-    private static final double SILENCE_THRESHOLD = Math.pow(10.0, SILENCE_THRESHOLD_DBFS / 20.0);
-    private static final double SILENCE_WINDOW_SECONDS = 0.01;
 
     private final AudioDecoder audioDecoder;
     private final int envelopePoints;
 
 
-    public AudioFeaturesService(AudioDecoder audioDecoder) {
+    public MusicFeaturesService(AudioDecoder audioDecoder) {
         this(audioDecoder, DEFAULT_ENVELOPE_POINTS);
     }
 
 
-    public AudioFeaturesService(AudioDecoder audioDecoder, int envelopePoints) {
+    public MusicFeaturesService(AudioDecoder audioDecoder, int envelopePoints) {
 
         if (envelopePoints <= 0) {
             throw new IllegalArgumentException("Envelope points must be greater than zero");
@@ -38,7 +34,7 @@ public final class AudioFeaturesService {
     }
 
 
-    public Optional<AudioFeatures> analyze(Path file) {
+    public Optional<MusicFeatures> analyze(Path file) {
 
         try (var stream = audioDecoder.open(file)) {
 
@@ -62,34 +58,21 @@ public final class AudioFeaturesService {
     }
 
 
-    private Optional<AudioFeatures> analyze(AudioInputStream stream, AudioFormat format, long totalFrames) throws IOException {
+    private Optional<MusicFeatures> analyze(AudioInputStream stream, AudioFormat format, long totalFrames) throws IOException {
 
-        var bucketCount = (int) Math.min(envelopePoints, totalFrames);
-
-        var bucketSquareSums = new double[bucketCount];
-        var bucketSampleCounts = new long[bucketCount];
-        var peakEnvelope = new float[bucketCount];
-
-        var frameSize = format.getFrameSize();
         var channels = format.getChannels();
+        var frameSize = format.getFrameSize();
         var bytesPerSample = format.getSampleSizeInBits() / 8;
 
-        var silenceWindowFrames = Math.max(1L, Math.round(format.getSampleRate() * SILENCE_WINDOW_SECONDS));
+        var amplitudeAnalyzer = new AmplitudeAnalyzer(totalFrames, channels, envelopePoints);
+        var rhythmAnalyzer = new MusicRhythmAnalyzer(format.getSampleRate());
+        var spectralAnalyzer = new SpectralAnalyzer(format.getSampleRate());
+        var stereoAnalyzer = channels == 2 ? new StereoAnalyzer() : null;
 
         var bufferSize = Math.max(frameSize, BUFFER_SIZE - BUFFER_SIZE % frameSize);
         var buffer = new byte[bufferSize];
 
         var frameIndex = 0L;
-        var sampleCount = 0L;
-        var squareSum = 0.0;
-
-        var peak = 0.0;
-        var peakFrameIndex = 0L;
-
-        var windowFrames = 0L;
-        var windowSampleCount = 0L;
-        var windowSquareSum = 0.0;
-        var silentFrames = 0L;
 
         int read;
 
@@ -112,7 +95,13 @@ public final class AudioFeaturesService {
                 }
 
                 var frameOffset = localFrame * frameSize;
-                var bucket = (int) (frameIndex * (long) bucketCount / totalFrames);
+
+                var frameSampleSum = 0.0;
+                var frameSquareSum = 0.0;
+                var framePeak = 0.0;
+
+                var leftSample = 0.0;
+                var rightSample = 0.0;
 
                 for (var channel = 0; channel < channels; channel++) {
 
@@ -123,95 +112,42 @@ public final class AudioFeaturesService {
                         return Optional.empty();
                     }
 
-                    var absoluteSample = Math.abs(sample);
-                    var square = sample * sample;
-
-                    squareSum += square;
-                    sampleCount++;
-
-                    bucketSquareSums[bucket] += square;
-                    bucketSampleCounts[bucket]++;
-
-                    peakEnvelope[bucket] = (float) Math.max(peakEnvelope[bucket], absoluteSample);
-
-                    windowSquareSum += square;
-                    windowSampleCount++;
-
-                    if (absoluteSample > peak) {
-                        peak = absoluteSample;
-                        peakFrameIndex = frameIndex;
+                    if (channel == 0) {
+                        leftSample = sample;
+                    } else if (channel == 1) {
+                        rightSample = sample;
                     }
+
+                    frameSampleSum += sample;
+                    frameSquareSum += sample * sample;
+                    framePeak = Math.max(framePeak, Math.abs(sample));
+                }
+
+                var monoSample = frameSampleSum / channels;
+                var frameAmplitude = Math.sqrt(frameSquareSum / channels);
+
+                amplitudeAnalyzer.accept(frameIndex, frameSquareSum, framePeak);
+                rhythmAnalyzer.accept(frameAmplitude);
+                spectralAnalyzer.accept(monoSample);
+
+                if (stereoAnalyzer != null) {
+                    stereoAnalyzer.accept(leftSample, rightSample);
                 }
 
                 frameIndex++;
-                windowFrames++;
-
-                if (windowFrames == silenceWindowFrames) {
-
-                    if (isSilent(windowSquareSum, windowSampleCount)) {
-                        silentFrames += windowFrames;
-                    }
-
-                    windowFrames = 0L;
-                    windowSampleCount = 0L;
-                    windowSquareSum = 0.0;
-                }
             }
         }
 
-        if (sampleCount == 0) {
+        if (frameIndex == 0) {
             return Optional.empty();
         }
 
-        if (windowFrames > 0 && isSilent(windowSquareSum, windowSampleCount)) {
-            silentFrames += windowFrames;
-        }
+        var amplitudeMetrics = amplitudeAnalyzer.finish();
+        var rhythmMetrics = rhythmAnalyzer.finish();
+        var spectralMetrics = spectralAnalyzer.finish();
+        var stereoCorrelation = stereoAnalyzer != null ? stereoAnalyzer.finish() : null;
 
-        var rmsEnvelope = createRmsEnvelope(bucketSquareSums, bucketSampleCounts);
-
-        var rms = Math.sqrt(squareSum / sampleCount);
-        var crestFactor = rms > 0.0 ? peak / rms : 0.0;
-        var silenceRatio = silentFrames / (double) frameIndex;
-        var peakTimeRatio = frameIndex > 1 && peak > 0.0
-                ? peakFrameIndex / (double) (frameIndex - 1)
-                : 0.0;
-
-        return Optional.of(new AudioFeatures(
-                peak,
-                rms,
-                crestFactor,
-                silenceRatio,
-                peakTimeRatio,
-                rmsEnvelope,
-                peakEnvelope
-        ));
-    }
-
-
-    private float[] createRmsEnvelope(double[] squareSums, long[] sampleCounts) {
-
-        var envelope = new float[squareSums.length];
-
-        for (var index = 0; index < envelope.length; index++) {
-
-            if (sampleCounts[index] > 0) {
-                envelope[index] = (float) Math.sqrt(squareSums[index] / sampleCounts[index]);
-            }
-        }
-
-        return envelope;
-    }
-
-
-    private boolean isSilent(double squareSum, long sampleCount) {
-
-        if (sampleCount == 0) {
-            return true;
-        }
-
-        var windowRms = Math.sqrt(squareSum / sampleCount);
-
-        return windowRms <= SILENCE_THRESHOLD;
+        return Optional.of(new MusicFeatures(amplitudeMetrics, stereoCorrelation, rhythmMetrics, spectralMetrics));
     }
 
 

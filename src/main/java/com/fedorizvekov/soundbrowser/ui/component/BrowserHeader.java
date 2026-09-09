@@ -19,7 +19,8 @@ import javafx.scene.layout.VBox;
 public final class BrowserHeader extends VBox {
 
     private final Button openDirectoryButton = new Button("Open Directory");
-    private final Button exportJsonlButton = new Button("Export JSONL");
+    private final Button exportSfxButton = new Button("Export SFX");
+    private final Button exportMusicButton = new Button("Export Music");
     private final Label directoryLabel = new Label("No directory selected");
     private final TextField searchField = new TextField();
     private final ProgressIndicator progressIndicator = new ProgressIndicator();
@@ -55,7 +56,8 @@ public final class BrowserHeader extends VBox {
                 separatorLabel,
                 directoryLabel,
                 progressIndicator,
-                exportJsonlButton
+                exportMusicButton,
+                exportSfxButton
         );
 
         toolbar.setAlignment(Pos.CENTER_LEFT);
@@ -69,13 +71,23 @@ public final class BrowserHeader extends VBox {
     }
 
 
+    public AudioFormatFilter getFormatFilter() {
+        return (AudioFormatFilter) formatGroup.getSelectedToggle().getUserData();
+    }
+
+
     public void setOnOpenDirectory(Runnable action) {
         openDirectoryButton.setOnAction(event -> action.run());
     }
 
 
-    public void setOnExportJsonl(Runnable action) {
-        exportJsonlButton.setOnAction(event -> action.run());
+    public void setOnExportSfx(Runnable action) {
+        exportSfxButton.setOnAction(event -> action.run());
+    }
+
+
+    public void setOnExportMusic(Runnable action) {
+        exportMusicButton.setOnAction(event -> action.run());
     }
 
 
@@ -86,11 +98,6 @@ public final class BrowserHeader extends VBox {
 
     public void setOnFormatChanged(Consumer<AudioFormatFilter> action) {
         onFormatChanged = action;
-    }
-
-
-    public AudioFormatFilter getFormatFilter() {
-        return (AudioFormatFilter) formatGroup.getSelectedToggle().getUserData();
     }
 
 
@@ -182,7 +189,8 @@ public final class BrowserHeader extends VBox {
     private void configureControls() {
 
         openDirectoryButton.getStyleClass().add("primary-button");
-        exportJsonlButton.getStyleClass().add("primary-button");
+        exportSfxButton.getStyleClass().add("primary-button");
+        exportMusicButton.getStyleClass().add("primary-button");
 
         directoryLabel.getStyleClass().add("directory-path");
         directoryLabel.setTextOverrun(OverrunStyle.CENTER_ELLIPSIS);
@@ -203,16 +211,20 @@ public final class BrowserHeader extends VBox {
     private void updateState() {
 
         var busy = loading || exporting;
+        var exportDisabled = busy || !hasSounds || !exportAvailable;
 
         openDirectoryButton.setDisable(busy);
         formatSwitch.setDisable(busy);
         searchField.setDisable(busy || !directorySelected);
-        exportJsonlButton.setDisable(busy || !hasSounds || !exportAvailable);
 
-        exportJsonlButton.setText(exporting ? "Exporting..." : "Export JSONL");
+        exportSfxButton.setDisable(exportDisabled);
+        exportMusicButton.setDisable(exportDisabled);
 
-        exportJsonlButton.setVisible(directorySelected);
-        exportJsonlButton.setManaged(directorySelected);
+        exportSfxButton.setVisible(directorySelected);
+        exportSfxButton.setManaged(directorySelected);
+
+        exportMusicButton.setVisible(directorySelected);
+        exportMusicButton.setManaged(directorySelected);
 
         progressIndicator.setVisible(busy);
         progressIndicator.setManaged(busy);

@@ -11,6 +11,7 @@ import com.fedorizvekov.soundbrowser.model.AudioFormatFilter;
 import com.fedorizvekov.soundbrowser.model.CatalogError;
 import com.fedorizvekov.soundbrowser.model.CatalogResult;
 import com.fedorizvekov.soundbrowser.model.SoundEntry;
+import com.fedorizvekov.soundbrowser.model.export.ExportProfile;
 import com.fedorizvekov.soundbrowser.model.export.JsonlExportResult;
 import com.fedorizvekov.soundbrowser.service.AudioPlayer;
 import com.fedorizvekov.soundbrowser.service.SoundCatalogService;
@@ -74,12 +75,16 @@ public final class SoundBrowserView extends BorderPane {
     private void configureView() {
 
         getStyleClass().add("sound-browser");
+
         var browserHeader = new VBox(12, header, statusView);
         browserHeader.getStyleClass().add("browser-header");
+
         setTop(browserHeader);
 
         var listContainer = new VBox(4, soundListHeader, soundList);
+
         VBox.setVgrow(soundList, Priority.ALWAYS);
+
         setCenter(listContainer);
         BorderPane.setMargin(listContainer, new Insets(12, 0, 0, 0));
     }
@@ -88,7 +93,8 @@ public final class SoundBrowserView extends BorderPane {
     private void configureActions() {
 
         header.setOnOpenDirectory(this::selectDirectory);
-        header.setOnExportJsonl(this::selectExportTarget);
+        header.setOnExportSfx(() -> selectExportTarget(ExportProfile.SFX));
+        header.setOnExportMusic(() -> selectExportTarget(ExportProfile.MUSIC));
         header.setOnSearch(this::filterSounds);
         header.setOnFormatChanged(this::changeFormatFilter);
 
@@ -100,9 +106,7 @@ public final class SoundBrowserView extends BorderPane {
 
     private void handlePlaybackFinished(Path file) {
 
-        if (!file.equals(audioPlayer.getCurrentFile())
-                || audioPlayer.isPaused()
-                || !audioPlayer.isFinished()) {
+        if (!file.equals(audioPlayer.getCurrentFile()) || audioPlayer.isPaused() || !audioPlayer.isFinished()) {
             return;
         }
 
@@ -249,7 +253,7 @@ public final class SoundBrowserView extends BorderPane {
     }
 
 
-    private void selectExportTarget() {
+    private void selectExportTarget(ExportProfile exportProfile) {
 
         if (loading || exporting) {
             return;
@@ -264,8 +268,8 @@ public final class SoundBrowserView extends BorderPane {
 
         var chooser = new FileChooser();
 
-        chooser.setTitle("Export sound library");
-        chooser.setInitialFileName("sound_library");
+        chooser.setTitle(exportProfile == ExportProfile.SFX ? "Export SFX library" : "Export music library");
+        chooser.setInitialFileName(exportProfile == ExportProfile.SFX ? "sfx_library" : "music_library");
         chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("JSON Lines (*.jsonl)", "*.jsonl"));
 
         var selectedFile = chooser.showSaveDialog(getScene().getWindow());
@@ -276,45 +280,48 @@ public final class SoundBrowserView extends BorderPane {
 
         var targetFile = ensureJsonlExtension(selectedFile.toPath());
 
-        startExport(entries, targetFile);
+        startExport(entries, targetFile, exportProfile);
     }
 
 
-    private void startExport(List<SoundEntry> entries, Path targetFile) {
+    private void startExport(List<SoundEntry> entries, Path targetFile, ExportProfile exportProfile) {
 
         audioPlayer.stop();
         soundList.refresh();
 
         setExporting(true);
 
-        statusView.showInfo("Exporting %,d sounds...".formatted(entries.size()));
+        statusView.showInfo("Exporting %,d sounds as %s...".formatted(entries.size(), formatExportProfile(exportProfile)));
 
-        Thread.ofVirtual().name("jsonl-exporter").start(() -> exportJsonl(entries, targetFile));
+        Thread.ofVirtual().name("jsonl-exporter").start(() -> exportJsonl(entries, targetFile, exportProfile));
     }
 
 
-    private void exportJsonl(List<SoundEntry> entries, Path targetFile) {
+    private void exportJsonl(List<SoundEntry> entries, Path targetFile, ExportProfile exportProfile) {
 
         try {
-            var result = jsonlExportService.export(entries, targetFile);
+            var result = jsonlExportService.export(entries, targetFile, exportProfile);
 
             Platform.runLater(() -> handleExportSuccess(result));
 
         } catch (IOException | RuntimeException exception) {
-
             Platform.runLater(() -> handleExportFailure(exception));
         }
     }
 
 
     private void handleExportSuccess(JsonlExportResult result) {
+
         setExporting(false);
+
         statusView.showSuccess("%,d sounds exported to %s".formatted(result.exportedCount(), result.file().getFileName()));
     }
 
 
     private void handleExportFailure(Exception exception) {
+
         setExporting(false);
+
         statusView.showError("JSONL export failed: " + formatException(exception));
     }
 
@@ -331,28 +338,29 @@ public final class SoundBrowserView extends BorderPane {
 
 
     private void setLoading(boolean loading) {
+
         this.loading = loading;
+
         header.setLoading(loading);
+
         updateState();
     }
 
 
     private void setExporting(boolean exporting) {
+
         this.exporting = exporting;
+
         header.setExporting(exporting);
+
         updateState();
     }
 
 
     private String formatSkippedFiles(List<CatalogError> errors) {
 
-        var wavErrors = errors.stream()
-                .filter(error -> error.fileType() == AudioFileType.WAV)
-                .count();
-
-        var oggErrors = errors.stream()
-                .filter(error -> error.fileType() == AudioFileType.OGG)
-                .count();
+        var wavErrors = errors.stream().filter(error -> error.fileType() == AudioFileType.WAV).count();
+        var oggErrors = errors.stream().filter(error -> error.fileType() == AudioFileType.OGG).count();
 
         var total = errors.size();
         var message = new StringBuilder();
@@ -382,6 +390,11 @@ public final class SoundBrowserView extends BorderPane {
     }
 
 
+    private String formatExportProfile(ExportProfile exportProfile) {
+        return exportProfile == ExportProfile.SFX ? "SFX" : "music";
+    }
+
+
     private String formatException(Exception exception) {
 
         var message = exception.getMessage();
@@ -395,7 +408,6 @@ public final class SoundBrowserView extends BorderPane {
 
 
     private String normalize(String value) {
-
         return value == null ? "" : value.strip().toLowerCase(Locale.ROOT);
     }
 

@@ -5,7 +5,8 @@ import com.fedorizvekov.soundbrowser.service.AudioDecoder;
 import com.fedorizvekov.soundbrowser.service.AudioPlayer;
 import com.fedorizvekov.soundbrowser.service.SoundCatalogService;
 import com.fedorizvekov.soundbrowser.service.WaveformService;
-import com.fedorizvekov.soundbrowser.service.export.AudioFeaturesService;
+import com.fedorizvekov.soundbrowser.service.analysis.MusicFeaturesService;
+import com.fedorizvekov.soundbrowser.service.analysis.SfxFeaturesService;
 import com.fedorizvekov.soundbrowser.service.export.JsonlExportService;
 import javafx.application.Application;
 import javafx.scene.Scene;
@@ -28,8 +29,9 @@ public final class SoundBrowserConfiguration extends Application {
         var audioDecoder = new AudioDecoder();
         var audioPlayer = new AudioPlayer(audioDecoder);
         var waveformService = new WaveformService(audioDecoder);
-        var audioFeaturesService = new AudioFeaturesService(audioDecoder);
-        var jsonlExportService = new JsonlExportService(audioFeaturesService);
+        var musicFeaturesService = new MusicFeaturesService(audioDecoder);
+        var sfxFeaturesService = new SfxFeaturesService(audioDecoder);
+        var jsonlExportService = new JsonlExportService(musicFeaturesService, sfxFeaturesService);
 
         var view = new SoundBrowserView(catalogService, jsonlExportService, audioPlayer, waveformService);
 

@@ -11,22 +11,28 @@ import java.util.Collection;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
 import com.fedorizvekov.soundbrowser.model.SoundEntry;
+import com.fedorizvekov.soundbrowser.model.analysis.AudioFeatures;
+import com.fedorizvekov.soundbrowser.model.export.ExportProfile;
 import com.fedorizvekov.soundbrowser.model.export.JsonlExportResult;
 import com.fedorizvekov.soundbrowser.model.export.JsonlSoundEntry;
+import com.fedorizvekov.soundbrowser.service.analysis.MusicFeaturesService;
+import com.fedorizvekov.soundbrowser.service.analysis.SfxFeaturesService;
 
 public final class JsonlExportService {
 
-    private final AudioFeaturesService audioFeaturesService;
+    private final MusicFeaturesService musicFeaturesService;
+    private final SfxFeaturesService sfxFeaturesService;
     private final ObjectWriter jsonWriter;
 
 
-    public JsonlExportService(AudioFeaturesService audioFeaturesService) {
-        this.audioFeaturesService = audioFeaturesService;
+    public JsonlExportService(MusicFeaturesService musicFeaturesService, SfxFeaturesService sfxFeaturesService) {
+        this.musicFeaturesService = musicFeaturesService;
+        this.sfxFeaturesService = sfxFeaturesService;
         jsonWriter = new ObjectMapper().writerFor(JsonlSoundEntry.class);
     }
 
 
-    public JsonlExportResult export(Collection<SoundEntry> entries, Path targetFile) throws IOException {
+    public JsonlExportResult export(Collection<SoundEntry> entries, Path targetFile, ExportProfile exportProfile) throws IOException {
 
         var absoluteTarget = targetFile.toAbsolutePath().normalize();
         var directory = absoluteTarget.getParent();
@@ -42,7 +48,7 @@ public final class JsonlExportService {
 
                 for (var entry : entries) {
 
-                    var features = audioFeaturesService.analyze(entry.path()).orElse(null);
+                    var features = analyzeFeatures(entry.path(), exportProfile);
 
                     var jsonlEntry = new JsonlSoundEntry(
                             normalizePath(entry.relativePath()),
@@ -69,6 +75,15 @@ public final class JsonlExportService {
     }
 
 
+    private AudioFeatures analyzeFeatures(Path file, ExportProfile exportProfile) {
+
+        return switch (exportProfile) {
+            case MUSIC -> musicFeaturesService.analyze(file).orElse(null);
+            case SFX -> sfxFeaturesService.analyze(file).orElse(null);
+        };
+    }
+
+
     private void replaceTarget(Path temporaryFile, Path targetFile) throws IOException {
 
         try {
@@ -86,4 +101,5 @@ public final class JsonlExportService {
     private String normalizePath(Path path) {
         return path.toString().replace('\\', '/');
     }
+
 }
