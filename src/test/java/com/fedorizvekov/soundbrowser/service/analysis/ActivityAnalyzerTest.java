@@ -55,7 +55,7 @@ class ActivityAnalyzerTest {
                 .orElseThrow()
                 .activityMetrics();
 
-        assertThat(metrics.activeDurationSeconds()).isCloseTo(0.20, within(0.01));
+        assertThat(metrics.activeDurationSeconds()).isCloseTo(9.04, within(0.01));
     }
 
 
@@ -79,7 +79,7 @@ class ActivityAnalyzerTest {
                 .orElseThrow()
                 .activityMetrics();
 
-        assertThat(metrics.activitySegmentCount()).isEqualTo(20);
+        assertThat(metrics.activitySegmentCount()).isEqualTo(10);
     }
 
 

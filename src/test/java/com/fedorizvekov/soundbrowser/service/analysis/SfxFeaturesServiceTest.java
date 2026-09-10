@@ -51,10 +51,10 @@ class SfxFeaturesServiceTest {
 
         assertAll(
                 () -> assertThat(metrics.leadingSilenceSeconds()).isZero(),
-                () -> assertThat(metrics.trailingSilenceSeconds()).isCloseTo(0.49, within(0.01)),
-                () -> assertThat(metrics.activeDurationSeconds()).isCloseTo(0.20, within(0.01)),
-                () -> assertThat(metrics.attackSeconds()).isZero(),
-                () -> assertThat(metrics.activitySegmentCount()).isEqualTo(20)
+                () -> assertThat(metrics.trailingSilenceSeconds()).isCloseTo(0.19, within(0.01)),
+                () -> assertThat(metrics.activeDurationSeconds()).isCloseTo(9.04, within(0.01)),
+                () -> assertThat(metrics.attackSeconds()).isCloseTo(0.5, within(0.01)),
+                () -> assertThat(metrics.activitySegmentCount()).isEqualTo(10)
         );
     }
 

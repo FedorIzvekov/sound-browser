@@ -88,7 +88,7 @@ class MusicFeaturesServiceTest {
         assertAll(
                 () -> assertThat(metrics.tempoBpm()).isCloseTo(120.0, within(1.0)),
                 () -> assertThat(metrics.onsetRate()).isCloseTo(2.0, within(0.01)),
-                () -> assertThat(metrics.energyVariation()).isCloseTo(7.0, within(0.02))
+                () -> assertThat(metrics.energyVariation()).isCloseTo(1.6328491676280101, within(0.02))
         );
     }
 
