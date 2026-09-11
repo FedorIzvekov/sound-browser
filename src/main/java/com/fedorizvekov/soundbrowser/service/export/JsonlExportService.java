@@ -8,6 +8,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.util.Collection;
+import java.util.function.LongConsumer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
 import com.fedorizvekov.soundbrowser.model.SoundEntry;
@@ -32,7 +33,7 @@ public final class JsonlExportService {
     }
 
 
-    public JsonlExportResult export(Collection<SoundEntry> entries, Path targetFile, ExportProfile exportProfile) throws IOException {
+    public JsonlExportResult export(Collection<SoundEntry> entries, Path targetFile, ExportProfile exportProfile, LongConsumer progressListener) throws IOException {
 
         var absoluteTarget = targetFile.toAbsolutePath().normalize();
         var directory = absoluteTarget.getParent();
@@ -62,6 +63,7 @@ public final class JsonlExportService {
                     writer.newLine();
 
                     exportedCount++;
+                    progressListener.accept(exportedCount);
                 }
             }
 
