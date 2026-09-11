@@ -280,7 +280,7 @@ public final class SoundBrowserView extends BorderPane {
         var chooser = new FileChooser();
 
         chooser.setTitle(exportProfile == ExportProfile.SFX ? "Export SFX library" : "Export music library");
-        chooser.setInitialFileName(buildExportFileName());
+        chooser.setInitialFileName(buildExportFileName(exportProfile));
 
         var selectedFile = chooser.showSaveDialog(getScene().getWindow());
 
@@ -471,11 +471,12 @@ public final class SoundBrowserView extends BorderPane {
     }
 
 
-    private String buildExportFileName() {
+    private String buildExportFileName(ExportProfile exportProfile) {
 
         var normalizedFolderName = currentDirectory.getFileName().toString().strip().toLowerCase(Locale.ROOT).replaceAll("[^\\p{L}\\p{N}._-]+", "_");
+        var suffix = exportProfile == ExportProfile.MUSIC ? "export" + "_music" :  "export" + "_sfx";
 
-        return "%s_%s.jsonl".formatted(normalizedFolderName, "export");
+        return "%s_%s.jsonl".formatted(normalizedFolderName, suffix);
     }
 
 }
