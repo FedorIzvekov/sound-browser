@@ -1,4 +1,4 @@
-# Sound Browser v1.0.18
+# Sound Browser v1.0.19
 
 A desktop application designed to help game developers quickly browse, preview, analyze, and select audio content from large sound libraries.
 
@@ -39,12 +39,12 @@ Sound Browser makes it easier to explore large collections of sound effects, fin
 
 ```bash
 ./mvnw clean package
-java -jar target/sound-browser-1.0.18.jar
+java -jar target/sound-browser-1.0.19.jar
 ```
 
 ### Windows
 
 ```powershell
 .\mvnw.cmd clean package
-java -jar target\sound-browser-1.0.18.jar
+java -jar target\sound-browser-1.0.19.jar
 ```

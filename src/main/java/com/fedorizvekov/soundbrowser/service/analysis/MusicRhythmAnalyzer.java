@@ -1,6 +1,7 @@
 package com.fedorizvekov.soundbrowser.service.analysis;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import com.fedorizvekov.soundbrowser.model.analysis.RhythmMetrics;
@@ -15,13 +16,18 @@ public final class MusicRhythmAnalyzer {
     private static final double MAX_TEMPO_BPM = 200.0;
 
     private static final double ONSET_THRESHOLD_STD_FACTOR = 0.5;
+    private static final double MIN_ONSET_STRENGTH_RATIO = 0.004;
 
     private static final double TEMPO_TOLERANCE_SECONDS = 0.03;
     private static final double MIN_TEMPO_CORRELATION = 0.25;
-    private static final double MIN_ONSET_STRENGTH_RATIO = 0.004;
 
     private static final double SECOND_HARMONIC_WEIGHT = 0.5;
     private static final double OCTAVE_PREFERENCE_RATIO = 0.95;
+
+    private static final double THIRD_METER_MIN_BEAT_COVERAGE = 0.75;
+    private static final double THIRD_METER_CORRELATION_RATIO = 0.85;
+
+    private static final double TEMPO_ONSET_REFERENCE_PERCENTILE = 0.90;
 
     private static final int MIN_TEMPO_ONSETS = 4;
     private static final int ONSET_SMOOTHING_WINDOWS = 3;
@@ -76,12 +82,14 @@ public final class MusicRhythmAnalyzer {
 
         var meanRms = calculateMeanRms();
         var energyVariation = calculateEnergyVariation(meanRms);
+
         var fineOnsetEnvelope = createFineOnsetEnvelope();
         var rhythmOnsetEnvelope = createRhythmOnsetEnvelope(fineOnsetEnvelope);
+
         var detectedOnsets = detectOnsets(rhythmOnsetEnvelope, fineOnsetEnvelope, meanRms);
 
         var onsetRate = calculateOnsetRate(detectedOnsets);
-        var tempoBpm = estimateTempo(detectedOnsets);
+        var tempoBpm = estimateTempo(detectedOnsets, onsetRate);
 
         return new RhythmMetrics(tempoBpm, onsetRate, energyVariation);
     }
@@ -96,22 +104,31 @@ public final class MusicRhythmAnalyzer {
     }
 
 
-    private double calculateEnergyVariation(double mean) {
+    private double calculateMeanRms() {
 
-        if (mean <= 0.0) {
+        return windowRms.stream()
+                .mapToDouble(Double::doubleValue)
+                .average()
+                .orElse(0.0);
+    }
+
+
+    private double calculateEnergyVariation(double meanRms) {
+
+        if (meanRms <= 0.0) {
             return 0.0;
         }
 
         var variance = 0.0;
 
         for (var value : windowRms) {
-            var difference = value - mean;
+            var difference = value - meanRms;
             variance += difference * difference;
         }
 
         variance /= windowRms.size();
 
-        return Math.sqrt(variance) / mean;
+        return Math.sqrt(variance) / meanRms;
     }
 
 
@@ -161,6 +178,7 @@ public final class MusicRhythmAnalyzer {
     private double[] createRhythmOnsetEnvelope(double[] fineOnsetEnvelope) {
 
         var size = (fineOnsetEnvelope.length + RHYTHM_WINDOW_COUNT - 1) / RHYTHM_WINDOW_COUNT;
+
         var envelope = new double[size];
 
         for (var block = 0; block < size; block++) {
@@ -178,15 +196,6 @@ public final class MusicRhythmAnalyzer {
         }
 
         return envelope;
-    }
-
-
-    private double calculateMeanRms() {
-
-        return windowRms.stream()
-                .mapToDouble(Double::doubleValue)
-                .average()
-                .orElse(0.0);
     }
 
 
@@ -241,6 +250,7 @@ public final class MusicRhythmAnalyzer {
     private double calculateLocalOnsetThreshold(double[] envelope, int center) {
 
         var from = Math.max(0, center - ONSET_THRESHOLD_RADIUS);
+
         var to = Math.min(envelope.length, center + ONSET_THRESHOLD_RADIUS + 1);
 
         var count = 0;
@@ -293,7 +303,7 @@ public final class MusicRhythmAnalyzer {
     }
 
 
-    private double estimateTempo(double[] detectedOnsets) {
+    private double estimateTempo(double[] detectedOnsets, double onsetRate) {
 
         if (countOnsets(detectedOnsets) < MIN_TEMPO_ONSETS) {
             return 0.0;
@@ -347,35 +357,9 @@ public final class MusicRhythmAnalyzer {
 
         bestLag = preferFasterOctave(bestLag, bestScore, correlations, scores, minLag, maxLag);
 
-        return 60.0 / (bestLag * WINDOW_SECONDS);
-    }
+        bestLag = preferSlowerThirdMeter(bestLag, correlations, onsetRate, minLag, maxLag);
 
-
-    private double[] createTempoEnvelope(double[] detectedOnsets) {
-
-        var envelope = new double[detectedOnsets.length];
-
-        for (var index = 0; index < detectedOnsets.length; index++) {
-
-            if (!isOnset(detectedOnsets[index])) {
-                continue;
-            }
-
-            for (var offset = -TEMPO_TOLERANCE_WINDOWS; offset <= TEMPO_TOLERANCE_WINDOWS; offset++) {
-
-                var target = index + offset;
-
-                if (target < 0 || target >= envelope.length) {
-                    continue;
-                }
-
-                var weight = 1.0 - Math.abs(offset) / (double) (TEMPO_TOLERANCE_WINDOWS + 1);
-
-                envelope[target] = Math.max(envelope[target], weight);
-            }
-        }
-
-        return envelope;
+        return lagToBpm(bestLag);
     }
 
 
@@ -414,6 +398,114 @@ public final class MusicRhythmAnalyzer {
     }
 
 
+    private int preferSlowerThirdMeter(int bestLag, double[] correlations, double onsetRate, int minLag, int maxLag) {
+
+        var bpm = lagToBpm(bestLag);
+        var beatRate = bpm / 60.0;
+
+        if (beatRate <= 0.0) {
+            return bestLag;
+        }
+
+        var beatCoverage = onsetRate / beatRate;
+
+        if (beatCoverage >= THIRD_METER_MIN_BEAT_COVERAGE) {
+            return bestLag;
+        }
+
+        var targetLag = bestLag * 3.0;
+
+        if (targetLag > maxLag) {
+            return bestLag;
+        }
+
+        var from = Math.max(minLag, (int) Math.floor(targetLag) - TEMPO_TOLERANCE_WINDOWS);
+
+        var to = Math.min(maxLag, (int) Math.ceil(targetLag) + TEMPO_TOLERANCE_WINDOWS);
+
+        var candidateLag = 0;
+        var candidateCorrelation = 0.0;
+
+        for (var lag = from; lag <= to; lag++) {
+
+            var correlation = correlations[lag];
+
+            if (correlation < MIN_TEMPO_CORRELATION) {
+                continue;
+            }
+
+            if (correlation < correlations[bestLag] * THIRD_METER_CORRELATION_RATIO) {
+                continue;
+            }
+
+            if (correlation > candidateCorrelation) {
+                candidateCorrelation = correlation;
+                candidateLag = lag;
+            }
+        }
+
+        return candidateLag > 0 ? candidateLag : bestLag;
+    }
+
+
+    private double[] createTempoEnvelope(double[] detectedOnsets) {
+
+        var envelope = new double[detectedOnsets.length];
+        var referenceStrength = calculateTempoOnsetReference(detectedOnsets);
+
+        if (referenceStrength <= 0.0) {
+            return envelope;
+        }
+
+        for (var index = 0; index < detectedOnsets.length; index++) {
+
+            var onsetStrength = detectedOnsets[index];
+
+            if (!isOnset(onsetStrength)) {
+                continue;
+            }
+
+            var normalizedStrength = Math.min(1.0, onsetStrength / referenceStrength);
+
+            var onsetWeight = Math.sqrt(normalizedStrength);
+
+            for (var offset = -TEMPO_TOLERANCE_WINDOWS; offset <= TEMPO_TOLERANCE_WINDOWS; offset++) {
+
+                var target = index + offset;
+
+                if (target < 0 || target >= envelope.length) {
+                    continue;
+                }
+
+                var toleranceWeight = 1.0 - Math.abs(offset) / (double) (TEMPO_TOLERANCE_WINDOWS + 1);
+
+                envelope[target] = Math.max(envelope[target], onsetWeight * toleranceWeight);
+            }
+        }
+
+        return envelope;
+    }
+
+
+    private double calculateTempoOnsetReference(double[] detectedOnsets) {
+
+        var strengths = Arrays.stream(detectedOnsets).filter(this::isOnset).sorted().toArray();
+
+        if (strengths.length == 0) {
+            return 0.0;
+        }
+
+        var index = (int) Math.round((strengths.length - 1) * TEMPO_ONSET_REFERENCE_PERCENTILE);
+
+        return strengths[index];
+    }
+
+
+    private double lagToBpm(int lag) {
+        return 60.0 / (lag * WINDOW_SECONDS);
+    }
+
+
     private double calculateCorrelation(double[] values, int lag) {
 
         var count = values.length - lag;
@@ -426,6 +518,7 @@ public final class MusicRhythmAnalyzer {
         var rightMean = 0.0;
 
         for (var index = lag; index < values.length; index++) {
+
             leftMean += values[index];
             rightMean += values[index - lag];
         }
