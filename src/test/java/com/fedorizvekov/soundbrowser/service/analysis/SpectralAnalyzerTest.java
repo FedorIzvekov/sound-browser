@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.within;
 import static org.junit.jupiter.api.Assertions.assertAll;
 
 import java.nio.file.Path;
+import java.util.Random;
 import com.fedorizvekov.soundbrowser.service.AudioDecoder;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -29,6 +30,7 @@ class SpectralAnalyzerTest {
     private static final double QUIET_SINE_POWER = 0.2 * 0.2 / 2.0;
     private static final double WHITE_NOISE_POWER = 1.0 / 3.0;
     private static final double DENSITY_ANALYZED_POWER = FULL_SINE_POWER + 5.0 * QUIET_SINE_POWER + noisePower(MIN_ANALYSIS_HZ, MAX_ANALYSIS_HZ);
+    private static final int SPECTRAL_TEST_SAMPLE_COUNT = 8_192;
 
     private final SfxFeaturesService sfxFeaturesService = new SfxFeaturesService(new AudioDecoder());
 
@@ -167,6 +169,11 @@ class SpectralAnalyzerTest {
 
         assertAll(
                 () -> assertThat(metrics.spectralCentroidHz()).isZero(),
+                () -> assertThat(metrics.spectralFlatness()).isZero(),
+                () -> assertThat(metrics.spectralRolloffHz()).isZero(),
+                () -> assertThat(metrics.spectralBandwidthHz()).isZero(),
+                () -> assertThat(metrics.spectralFlux()).isZero(),
+                () -> assertThat(metrics.spectralCentroidVariationHz()).isZero(),
                 () -> assertThat(metrics.subEnergy()).isZero(),
                 () -> assertThat(metrics.lowEnergy()).isZero(),
                 () -> assertThat(metrics.midEnergy()).isZero(),
@@ -214,6 +221,11 @@ class SpectralAnalyzerTest {
 
         assertAll(
                 () -> assertThat(metrics.spectralCentroidHz()).isZero(),
+                () -> assertThat(metrics.spectralFlatness()).isZero(),
+                () -> assertThat(metrics.spectralRolloffHz()).isZero(),
+                () -> assertThat(metrics.spectralBandwidthHz()).isZero(),
+                () -> assertThat(metrics.spectralFlux()).isZero(),
+                () -> assertThat(metrics.spectralCentroidVariationHz()).isZero(),
                 () -> assertThat(metrics.subEnergy()).isZero(),
                 () -> assertThat(metrics.lowEnergy()).isZero(),
                 () -> assertThat(metrics.midEnergy()).isZero(),
@@ -234,10 +246,130 @@ class SpectralAnalyzerTest {
     }
 
 
+    @Test
+    @DisplayName("Should calculate spectral flatness")
+    void shouldCalculateSpectralFlatness() {
+
+        var toneAnalyzer = new SpectralAnalyzer(SAMPLE_RATE);
+        var noiseAnalyzer = new SpectralAnalyzer(SAMPLE_RATE);
+
+        acceptSine(toneAnalyzer, 1_000.0, SPECTRAL_TEST_SAMPLE_COUNT);
+        acceptWhiteNoise(noiseAnalyzer, SPECTRAL_TEST_SAMPLE_COUNT);
+
+        var toneMetrics = toneAnalyzer.finish();
+        var noiseMetrics = noiseAnalyzer.finish();
+
+        assertAll(
+                () -> assertThat(toneMetrics.spectralFlatness()).isLessThan(0.01),
+                () -> assertThat(noiseMetrics.spectralFlatness()).isGreaterThan(0.4),
+                () -> assertThat(noiseMetrics.spectralFlatness()).isGreaterThan(toneMetrics.spectralFlatness())
+        );
+    }
+
+
+    @Test
+    @DisplayName("Should calculate spectral rolloff")
+    void shouldCalculateSpectralRolloff() {
+
+        var lowAnalyzer = new SpectralAnalyzer(SAMPLE_RATE);
+        var highAnalyzer = new SpectralAnalyzer(SAMPLE_RATE);
+
+        acceptSine(lowAnalyzer, 500.0, SPECTRAL_TEST_SAMPLE_COUNT);
+        acceptSine(highAnalyzer, 5_000.0, SPECTRAL_TEST_SAMPLE_COUNT);
+
+        var lowMetrics = lowAnalyzer.finish();
+        var highMetrics = highAnalyzer.finish();
+
+        assertAll(
+                () -> assertThat(lowMetrics.spectralRolloffHz()).isCloseTo(500.0, within(30.0)),
+                () -> assertThat(highMetrics.spectralRolloffHz()).isCloseTo(5_000.0, within(30.0)),
+                () -> assertThat(highMetrics.spectralRolloffHz()).isGreaterThan(lowMetrics.spectralRolloffHz())
+        );
+    }
+
+
+    @Test
+    @DisplayName("Should calculate spectral bandwidth")
+    void shouldCalculateSpectralBandwidth() {
+
+        var toneAnalyzer = new SpectralAnalyzer(SAMPLE_RATE);
+        var noiseAnalyzer = new SpectralAnalyzer(SAMPLE_RATE);
+
+        acceptSine(toneAnalyzer, 1_000.0, SPECTRAL_TEST_SAMPLE_COUNT);
+        acceptWhiteNoise(noiseAnalyzer, SPECTRAL_TEST_SAMPLE_COUNT);
+
+        var toneMetrics = toneAnalyzer.finish();
+        var noiseMetrics = noiseAnalyzer.finish();
+
+        assertAll(
+                () -> assertThat(toneMetrics.spectralBandwidthHz()).isLessThan(100.0),
+                () -> assertThat(noiseMetrics.spectralBandwidthHz()).isGreaterThan(1_000.0),
+                () -> assertThat(noiseMetrics.spectralBandwidthHz()).isGreaterThan(toneMetrics.spectralBandwidthHz())
+        );
+    }
+
+
+    @Test
+    @DisplayName("Should calculate spectral flux")
+    void shouldCalculateSpectralFlux() {
+
+        var stableAnalyzer = new SpectralAnalyzer(SAMPLE_RATE);
+        var changingAnalyzer = new SpectralAnalyzer(SAMPLE_RATE);
+
+        acceptSine(stableAnalyzer, 1_000.0, 8_192);
+
+        acceptSine(changingAnalyzer, 500.0, 4_096);
+        acceptSine(changingAnalyzer, 5_000.0, 4_096);
+
+        var stableMetrics = stableAnalyzer.finish();
+        var changingMetrics = changingAnalyzer.finish();
+
+        assertAll(
+                () -> assertThat(stableMetrics.spectralFlux()).isLessThan(0.01),
+                () -> assertThat(changingMetrics.spectralFlux()).isGreaterThan(0.1),
+                () -> assertThat(changingMetrics.spectralFlux()).isGreaterThan(stableMetrics.spectralFlux())
+        );
+    }
+
+
+    @Test
+    @DisplayName("Should calculate spectral centroid variation")
+    void shouldCalculateSpectralCentroidVariation() {
+
+        var stableAnalyzer = new SpectralAnalyzer(SAMPLE_RATE);
+        var changingAnalyzer = new SpectralAnalyzer(SAMPLE_RATE);
+
+        acceptSine(stableAnalyzer, 1_000.0, 8_192);
+
+        acceptSine(changingAnalyzer, 500.0, 4_096);
+        acceptSine(changingAnalyzer, 5_000.0, 4_096);
+
+        var stableMetrics = stableAnalyzer.finish();
+        var changingMetrics = changingAnalyzer.finish();
+
+        assertAll(
+                () -> assertThat(stableMetrics.spectralCentroidVariationHz()).isLessThan(20.0),
+                () -> assertThat(changingMetrics.spectralCentroidVariationHz()).isGreaterThan(500.0),
+                () -> assertThat(changingMetrics.spectralCentroidVariationHz())
+                        .isGreaterThan(stableMetrics.spectralCentroidVariationHz())
+        );
+    }
+
+
     private void acceptSine(SpectralAnalyzer analyzer, double frequencyHz, int sampleCount) {
 
         for (var index = 0; index < sampleCount; index++) {
             analyzer.accept(Math.sin(2.0 * Math.PI * frequencyHz * index / SAMPLE_RATE));
+        }
+    }
+
+
+    private void acceptWhiteNoise(SpectralAnalyzer analyzer, int sampleCount) {
+
+        var random = new Random(42);
+
+        for (var index = 0; index < sampleCount; index++) {
+            analyzer.accept(random.nextDouble() * 2.0 - 1.0);
         }
     }
 

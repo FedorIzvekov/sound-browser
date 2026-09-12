@@ -17,6 +17,9 @@ public final class SpectralAnalyzer {
     private static final double HIGH_MAX_HZ = 8_000.0;
     private static final double MAX_ANALYSIS_FREQUENCY_HZ = 20_000.0;
 
+    private static final double ROLLOFF_PERCENTILE = 0.85;
+    private static final double FLATNESS_POWER_FLOOR = 1.0e-300;
+
     private final double sampleRate;
     private final int fftSize;
     private final int hopSize;
@@ -25,13 +28,27 @@ public final class SpectralAnalyzer {
     private final double[] samples;
     private final double[] real;
     private final double[] imaginary;
+    private final double[] previousNormalizedPower;
 
     private int sampleCount;
     private int newSamplesSinceLastWindow;
     private long processedWindows;
+    private long spectralWindowCount;
 
     private double magnitudeSum;
     private double weightedFrequencyMagnitudeSum;
+
+    private double spectralFlatnessSum;
+    private double spectralRolloffSum;
+    private double spectralBandwidthSum;
+
+    private boolean hasPreviousSpectrum;
+    private long spectralFluxCount;
+    private double spectralFluxSum;
+
+    private long centroidWindowCount;
+    private double centroidMean;
+    private double centroidM2;
 
     private double subEnergy;
     private double lowEnergy;
@@ -54,6 +71,7 @@ public final class SpectralAnalyzer {
         this.samples = new double[fftSize];
         this.real = new double[fftSize];
         this.imaginary = new double[fftSize];
+        this.previousNormalizedPower = new double[fftSize / 2 + 1];
     }
 
 
@@ -64,7 +82,7 @@ public final class SpectralAnalyzer {
 
         if (sampleCount == fftSize) {
 
-            processWindow();
+            processWindow(true);
 
             System.arraycopy(samples, hopSize, samples, 0, fftSize - hopSize);
 
@@ -80,19 +98,47 @@ public final class SpectralAnalyzer {
 
             Arrays.fill(samples, sampleCount, fftSize, 0.0);
 
-            processWindow();
+            processWindow(false);
             newSamplesSinceLastWindow = 0;
         }
 
         var totalEnergy = subEnergy + lowEnergy + midEnergy + highEnergy + veryHighEnergy;
-        var spectralCentroidHz = magnitudeSum > 0.0 ? weightedFrequencyMagnitudeSum / magnitudeSum : 0.0;
 
-        if (totalEnergy <= 0.0) {
-            return new SpectralMetrics(spectralCentroidHz, 0.0, 0.0, 0.0, 0.0, 0.0);
+        var spectralCentroidHz = magnitudeSum > 0.0
+                ? weightedFrequencyMagnitudeSum / magnitudeSum
+                : 0.0;
+
+        var spectralFlux = spectralFluxCount > 0
+                ? spectralFluxSum / spectralFluxCount
+                : 0.0;
+
+        var spectralCentroidVariationHz = centroidWindowCount > 1
+                ? Math.sqrt(centroidM2 / centroidWindowCount)
+                : 0.0;
+
+        if (totalEnergy <= 0.0 || spectralWindowCount == 0) {
+            return new SpectralMetrics(
+                    spectralCentroidHz,
+                    0.0,
+                    0.0,
+                    0.0,
+                    spectralFlux,
+                    spectralCentroidVariationHz,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+            );
         }
 
         return new SpectralMetrics(
                 spectralCentroidHz,
+                spectralFlatnessSum / spectralWindowCount,
+                spectralRolloffSum / spectralWindowCount,
+                spectralBandwidthSum / spectralWindowCount,
+                spectralFlux,
+                spectralCentroidVariationHz,
                 subEnergy / totalEnergy,
                 lowEnergy / totalEnergy,
                 midEnergy / totalEnergy,
@@ -102,7 +148,7 @@ public final class SpectralAnalyzer {
     }
 
 
-    private void processWindow() {
+    private void processWindow(boolean includeTemporalMetrics) {
 
         for (var index = 0; index < fftSize; index++) {
             real[index] = samples[index] * window[index];
@@ -114,6 +160,16 @@ public final class SpectralAnalyzer {
         var nyquistHz = sampleRate / 2.0;
         var maxFrequencyHz = Math.min(MAX_ANALYSIS_FREQUENCY_HZ, nyquistHz);
         var maxBin = Math.min(fftSize / 2, (int) Math.floor(maxFrequencyHz * fftSize / sampleRate));
+
+        var windowMagnitudeSum = 0.0;
+        var windowWeightedFrequencyMagnitudeSum = 0.0;
+
+        var windowPowerSum = 0.0;
+        var windowWeightedFrequencyPowerSum = 0.0;
+
+        var flatnessPowerSum = 0.0;
+        var flatnessLogPowerSum = 0.0;
+        var analyzedBinCount = 0;
 
         for (var bin = 1; bin <= maxBin; bin++) {
 
@@ -132,6 +188,18 @@ public final class SpectralAnalyzer {
             magnitudeSum += magnitude;
             weightedFrequencyMagnitudeSum += frequencyHz * magnitude;
 
+            windowMagnitudeSum += magnitude;
+            windowWeightedFrequencyMagnitudeSum += frequencyHz * magnitude;
+
+            windowPowerSum += power;
+            windowWeightedFrequencyPowerSum += frequencyHz * power;
+
+            var flatnessPower = Math.max(power, FLATNESS_POWER_FLOOR);
+
+            flatnessPowerSum += flatnessPower;
+            flatnessLogPowerSum += Math.log(flatnessPower);
+            analyzedBinCount++;
+
             if (frequencyHz < SUB_MAX_HZ) {
                 subEnergy += power;
             } else if (frequencyHz < LOW_MAX_HZ) {
@@ -145,7 +213,140 @@ public final class SpectralAnalyzer {
             }
         }
 
+        if (windowPowerSum > 0.0 && windowMagnitudeSum > 0.0 && analyzedBinCount > 0) {
+
+            var windowMagnitudeCentroidHz = windowWeightedFrequencyMagnitudeSum / windowMagnitudeSum;
+            var windowPowerCentroidHz = windowWeightedFrequencyPowerSum / windowPowerSum;
+
+            spectralFlatnessSum += calculateSpectralFlatness(flatnessPowerSum, flatnessLogPowerSum, analyzedBinCount);
+
+            spectralRolloffSum += calculateSpectralRolloff(maxBin, windowPowerSum);
+
+            spectralBandwidthSum += calculateSpectralBandwidth(maxBin, windowPowerCentroidHz, windowPowerSum);
+
+            spectralWindowCount++;
+
+            if (includeTemporalMetrics) {
+                updateSpectralFlux(maxBin, windowPowerSum);
+                updateCentroidVariation(windowMagnitudeCentroidHz);
+            }
+
+        } else if (includeTemporalMetrics) {
+            hasPreviousSpectrum = false;
+        }
+
         processedWindows++;
+    }
+
+
+    private double calculateSpectralFlatness(double powerSum, double logPowerSum, int binCount) {
+
+        var arithmeticMean = powerSum / binCount;
+        var geometricMean = Math.exp(logPowerSum / binCount);
+
+        return Math.min(1.0, geometricMean / arithmeticMean);
+    }
+
+
+    private double calculateSpectralRolloff(int maxBin, double powerSum) {
+
+        var targetPower = powerSum * ROLLOFF_PERCENTILE;
+        var cumulativePower = 0.0;
+        var rolloffHz = 0.0;
+
+        for (var bin = 1; bin <= maxBin; bin++) {
+
+            var frequencyHz = bin * sampleRate / fftSize;
+
+            if (frequencyHz < MIN_ANALYSIS_FREQUENCY_HZ) {
+                continue;
+            }
+
+            var realValue = real[bin];
+            var imaginaryValue = imaginary[bin];
+            var power = realValue * realValue + imaginaryValue * imaginaryValue;
+
+            cumulativePower += power;
+            rolloffHz = frequencyHz;
+
+            if (cumulativePower >= targetPower) {
+                break;
+            }
+        }
+
+        return rolloffHz;
+    }
+
+
+    private double calculateSpectralBandwidth(int maxBin, double centroidHz, double powerSum) {
+
+        var weightedSquaredDeviationSum = 0.0;
+
+        for (var bin = 1; bin <= maxBin; bin++) {
+
+            var frequencyHz = bin * sampleRate / fftSize;
+
+            if (frequencyHz < MIN_ANALYSIS_FREQUENCY_HZ) {
+                continue;
+            }
+
+            var realValue = real[bin];
+            var imaginaryValue = imaginary[bin];
+
+            var power = realValue * realValue + imaginaryValue * imaginaryValue;
+            var deviation = frequencyHz - centroidHz;
+
+            weightedSquaredDeviationSum += power * deviation * deviation;
+        }
+
+        return Math.sqrt(weightedSquaredDeviationSum / powerSum);
+    }
+
+
+    private void updateSpectralFlux(int maxBin, double powerSum) {
+
+        var squaredDifferenceSum = 0.0;
+
+        for (var bin = 1; bin <= maxBin; bin++) {
+
+            var frequencyHz = bin * sampleRate / fftSize;
+
+            if (frequencyHz < MIN_ANALYSIS_FREQUENCY_HZ) {
+                continue;
+            }
+
+            var realValue = real[bin];
+            var imaginaryValue = imaginary[bin];
+            var power = realValue * realValue + imaginaryValue * imaginaryValue;
+
+            var normalizedPower = power / powerSum;
+
+            if (hasPreviousSpectrum) {
+                var difference = normalizedPower - previousNormalizedPower[bin];
+                squaredDifferenceSum += difference * difference;
+            }
+
+            previousNormalizedPower[bin] = normalizedPower;
+        }
+
+        if (hasPreviousSpectrum) {
+            spectralFluxSum += Math.sqrt(squaredDifferenceSum);
+            spectralFluxCount++;
+        }
+
+        hasPreviousSpectrum = true;
+    }
+
+
+    private void updateCentroidVariation(double centroidHz) {
+
+        centroidWindowCount++;
+
+        var delta = centroidHz - centroidMean;
+        centroidMean += delta / centroidWindowCount;
+
+        var deltaAfterMeanUpdate = centroidHz - centroidMean;
+        centroidM2 += delta * deltaAfterMeanUpdate;
     }
 
 
@@ -239,4 +440,5 @@ public final class SpectralAnalyzer {
             }
         }
     }
+
 }

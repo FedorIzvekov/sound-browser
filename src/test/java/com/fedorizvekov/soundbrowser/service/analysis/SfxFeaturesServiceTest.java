@@ -112,6 +112,9 @@ class SfxFeaturesServiceTest {
 
         assertAll(
                 () -> assertThat(metrics.spectralCentroidHz()).isCloseTo(1_000.0, within(20.0)),
+                () -> assertThat(metrics.spectralFlatness()).isLessThan(0.01),
+                () -> assertThat(metrics.spectralRolloffHz()).isCloseTo(1_000.0, within(30.0)),
+                () -> assertThat(metrics.spectralBandwidthHz()).isLessThan(100.0),
                 () -> assertThat(metrics.subEnergy()).isLessThan(0.001),
                 () -> assertThat(metrics.lowEnergy()).isLessThan(0.001),
                 () -> assertThat(metrics.midEnergy()).isGreaterThan(0.999),
