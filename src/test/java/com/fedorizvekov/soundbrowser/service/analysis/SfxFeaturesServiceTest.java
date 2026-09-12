@@ -34,6 +34,10 @@ class SfxFeaturesServiceTest {
 
     private static final double DYNAMICS_CREST_FACTOR = HIGH_PEAK / DYNAMICS_RMS;
 
+    private static final double DYNAMICS_MEAN_RMS = (LOW_RMS + MID_RMS + HIGH_RMS) / 3.0;
+
+    private static final double DYNAMICS_RMS_VARIATION = Math.sqrt((Math.pow(LOW_RMS - DYNAMICS_MEAN_RMS, 2) + Math.pow(MID_RMS - DYNAMICS_MEAN_RMS, 2) + Math.pow(HIGH_RMS - DYNAMICS_MEAN_RMS, 2)) / 3.0) / DYNAMICS_MEAN_RMS;
+
     private final AudioDecoder audioDecoder = new AudioDecoder();
     private final SfxFeaturesService service = new SfxFeaturesService(audioDecoder);
 
@@ -73,6 +77,11 @@ class SfxFeaturesServiceTest {
                 () -> assertThat(metrics.peak()).isCloseTo(HIGH_PEAK, within(0.0001)),
                 () -> assertThat(metrics.rms()).isCloseTo(DYNAMICS_RMS, within(0.0001)),
                 () -> assertThat(metrics.crestFactor()).isCloseTo(DYNAMICS_CREST_FACTOR, within(0.001)),
+                () -> assertThat(metrics.rmsVariation()).isCloseTo(DYNAMICS_RMS_VARIATION, within(0.001)),
+                () -> assertThat(metrics.rmsStartRatio()).isPositive(),
+                () -> assertThat(metrics.rmsMiddleRatio()).isGreaterThan(metrics.rmsStartRatio()),
+                () -> assertThat(metrics.rmsEndRatio()).isGreaterThan(metrics.rmsMiddleRatio()),
+                () -> assertThat(metrics.peakPosition()).isBetween(0.6, 1.0),
                 () -> assertThat(metrics.rmsEnvelope()).hasSize(3),
                 () -> assertThat(metrics.rmsEnvelope()[0]).isCloseTo((float) LOW_RMS, within(0.0001f)),
                 () -> assertThat(metrics.rmsEnvelope()[1]).isCloseTo((float) MID_RMS, within(0.0001f)),
@@ -115,6 +124,8 @@ class SfxFeaturesServiceTest {
                 () -> assertThat(metrics.spectralFlatness()).isLessThan(0.01),
                 () -> assertThat(metrics.spectralRolloffHz()).isCloseTo(1_000.0, within(30.0)),
                 () -> assertThat(metrics.spectralBandwidthHz()).isLessThan(100.0),
+                () -> assertThat(metrics.spectralFlux()).isGreaterThanOrEqualTo(0.0),
+                () -> assertThat(metrics.spectralCentroidVariationHz()).isGreaterThanOrEqualTo(0.0),
                 () -> assertThat(metrics.subEnergy()).isLessThan(0.001),
                 () -> assertThat(metrics.lowEnergy()).isLessThan(0.001),
                 () -> assertThat(metrics.midEnergy()).isGreaterThan(0.999),
@@ -135,7 +146,7 @@ class SfxFeaturesServiceTest {
     }
 
 
-// TODO after fix & update dependency vorbisspi
+    // TODO after fix & update dependency vorbisspi
     @Disabled
     @Test
     @DisplayName("Should analyze OGG audio")

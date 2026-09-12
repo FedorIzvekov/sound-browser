@@ -64,7 +64,7 @@ public final class SfxFeaturesService {
         var frameSize = format.getFrameSize();
         var bytesPerSample = format.getSampleSizeInBits() / 8;
 
-        var amplitudeAnalyzer = new AmplitudeAnalyzer(totalFrames, channels, envelopePoints);
+        var amplitudeAnalyzer = new AmplitudeAnalyzer(totalFrames, channels, envelopePoints, format.getSampleRate());
         var activityAnalyzer = new ActivityAnalyzer(format.getSampleRate());
         var spectralAnalyzer = new SpectralAnalyzer(format.getSampleRate());
         var stereoAnalyzer = channels == 2 ? new StereoAnalyzer() : null;
