@@ -44,6 +44,26 @@ class MusicFeaturesServiceTest {
 
 
     @Test
+    @DisplayName("Should calculate activity features")
+    void shouldCalculateActivityFeatures() {
+
+        var metrics = service.analyze(AUDIO_DIR.resolve("rhythm_120bpm.wav"))
+                .orElseThrow()
+                .activityMetrics();
+
+        assertAll(
+                () -> assertThat(metrics.leadingSilenceSeconds()).isZero(),
+                () -> assertThat(metrics.trailingSilenceSeconds()).isCloseTo(0.19, within(0.01)),
+                () -> assertThat(metrics.activeDurationSeconds()).isCloseTo(9.04, within(0.01)),
+                () -> assertThat(metrics.attackSeconds()).isCloseTo(0.5, within(0.01)),
+                () -> assertThat(metrics.activitySegmentCount()).isEqualTo(10),
+                () -> assertThat(metrics.onsetCount()).isGreaterThanOrEqualTo(metrics.activitySegmentCount()),
+                () -> assertThat(metrics.onsetRate()).isPositive()
+        );
+    }
+
+
+    @Test
     @DisplayName("Should calculate amplitude features")
     void shouldCalculateAmplitudeFeatures() {
 
@@ -149,6 +169,7 @@ class MusicFeaturesServiceTest {
         assertAll(
                 () -> assertThat(features.amplitudeMetrics().peak()).isPositive(),
                 () -> assertThat(features.amplitudeMetrics().rms()).isPositive(),
+                () -> assertThat(features.activityMetrics()).isNotNull(),
                 () -> assertThat(features.rhythmMetrics()).isNotNull(),
                 () -> assertThat(features.spectralMetrics().spectralCentroidHz()).isPositive()
         );

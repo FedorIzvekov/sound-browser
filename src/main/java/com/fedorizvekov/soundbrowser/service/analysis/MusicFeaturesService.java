@@ -65,6 +65,7 @@ public final class MusicFeaturesService {
         var bytesPerSample = format.getSampleSizeInBits() / 8;
 
         var amplitudeAnalyzer = new AmplitudeAnalyzer(totalFrames, channels, envelopePoints, format.getSampleRate());
+        var activityAnalyzer = new ActivityAnalyzer(format.getSampleRate());
         var rhythmAnalyzer = new MusicRhythmAnalyzer(format.getSampleRate());
         var spectralAnalyzer = new SpectralAnalyzer(format.getSampleRate());
         var stereoAnalyzer = channels == 2 ? new StereoAnalyzer() : null;
@@ -127,6 +128,7 @@ public final class MusicFeaturesService {
                 var frameAmplitude = Math.sqrt(frameSquareSum / channels);
 
                 amplitudeAnalyzer.accept(frameIndex, frameSquareSum, framePeak);
+                activityAnalyzer.accept(frameAmplitude);
                 rhythmAnalyzer.accept(frameAmplitude);
                 spectralAnalyzer.accept(monoSample);
 
@@ -143,11 +145,12 @@ public final class MusicFeaturesService {
         }
 
         var amplitudeMetrics = amplitudeAnalyzer.finish();
+        var activityMetrics = activityAnalyzer.finish();
         var rhythmMetrics = rhythmAnalyzer.finish();
         var spectralMetrics = spectralAnalyzer.finish();
         var stereoCorrelation = stereoAnalyzer != null ? stereoAnalyzer.finish() : null;
 
-        return Optional.of(new MusicFeatures(amplitudeMetrics, stereoCorrelation, rhythmMetrics, spectralMetrics));
+        return Optional.of(new MusicFeatures(amplitudeMetrics, activityMetrics, stereoCorrelation, rhythmMetrics, spectralMetrics));
     }
 
 
