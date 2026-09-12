@@ -5,6 +5,8 @@ public record ActivityMetrics(
         double trailingSilenceSeconds,
         double activeDurationSeconds,
         double attackSeconds,
-        int activitySegmentCount
+        int activitySegmentCount,
+        int onsetCount,
+        double onsetRate
 ) {
 }

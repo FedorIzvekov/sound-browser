@@ -84,6 +84,61 @@ class ActivityAnalyzerTest {
 
 
     @Test
+    @DisplayName("Should count multiple onsets inside one activity segment")
+    void shouldCountMultipleOnsetsInsideOneActivitySegment() {
+
+        accept(analyzer, 1.0, 100);
+        accept(analyzer, 0.2, 200);
+        accept(analyzer, 1.0, 100);
+
+        var metrics = analyzer.finish();
+
+        assertAll(
+                () -> assertThat(metrics.activitySegmentCount()).isEqualTo(1),
+                () -> assertThat(metrics.onsetCount()).isEqualTo(2),
+                () -> assertThat(metrics.onsetRate()).isCloseTo(5.0, within(0.000001))
+        );
+    }
+
+
+    @Test
+    @DisplayName("Should ignore small level changes as onsets")
+    void shouldIgnoreSmallLevelChangesAsOnsets() {
+
+        accept(analyzer, 1.0, 100);
+        accept(analyzer, 0.7, 100);
+        accept(analyzer, 1.0, 100);
+
+        var metrics = analyzer.finish();
+
+        assertAll(
+                () -> assertThat(metrics.activitySegmentCount()).isEqualTo(1),
+                () -> assertThat(metrics.onsetCount()).isEqualTo(1)
+        );
+    }
+
+
+    @Test
+    @DisplayName("Should count separated events as onsets")
+    void shouldCountSeparatedEventsAsOnsets() {
+
+        accept(analyzer, 1.0, 10);
+        accept(analyzer, 0.0, 90);
+
+        accept(analyzer, 1.0, 10);
+        accept(analyzer, 0.0, 90);
+
+        var metrics = analyzer.finish();
+
+        assertAll(
+                () -> assertThat(metrics.activitySegmentCount()).isEqualTo(2),
+                () -> assertThat(metrics.onsetCount()).isEqualTo(2),
+                () -> assertThat(metrics.onsetRate()).isCloseTo(10.0, within(0.000001))
+        );
+    }
+
+
+    @Test
     @DisplayName("Should return full duration as leading silence for inactive signal")
     void shouldReturnFullDurationAsLeadingSilenceForInactiveSignal() {
 
@@ -96,7 +151,9 @@ class ActivityAnalyzerTest {
                 () -> assertThat(metrics.trailingSilenceSeconds()).isZero(),
                 () -> assertThat(metrics.activeDurationSeconds()).isZero(),
                 () -> assertThat(metrics.attackSeconds()).isZero(),
-                () -> assertThat(metrics.activitySegmentCount()).isZero()
+                () -> assertThat(metrics.activitySegmentCount()).isZero(),
+                () -> assertThat(metrics.onsetCount()).isZero(),
+                () -> assertThat(metrics.onsetRate()).isZero()
         );
     }
 
@@ -151,7 +208,9 @@ class ActivityAnalyzerTest {
                 () -> assertThat(metrics.trailingSilenceSeconds()).isZero(),
                 () -> assertThat(metrics.activeDurationSeconds()).isZero(),
                 () -> assertThat(metrics.attackSeconds()).isZero(),
-                () -> assertThat(metrics.activitySegmentCount()).isZero()
+                () -> assertThat(metrics.activitySegmentCount()).isZero(),
+                () -> assertThat(metrics.onsetCount()).isZero(),
+                () -> assertThat(metrics.onsetRate()).isZero()
         );
     }
 

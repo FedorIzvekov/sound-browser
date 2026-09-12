@@ -17,6 +17,11 @@ public final class ActivityAnalyzer {
     private static final double EVENT_GAP_SECONDS = 0.08;
     private static final double ATTACK_LEVEL_RATIO = 0.9;
 
+    private static final double ONSET_RISE_DB = 6.0;
+    private static final double ONSET_RISE_RATIO = Math.pow(10.0, ONSET_RISE_DB / 20.0);
+    private static final double ONSET_LOOKBACK_SECONDS = 0.05;
+    private static final double ONSET_MIN_INTERVAL_SECONDS = 0.05;
+
     private final double sampleRate;
     private final int windowFrames;
     private final List<Double> windowRms = new ArrayList<>();
@@ -68,7 +73,7 @@ public final class ActivityAnalyzer {
         }
 
         if (maximumWindowRms <= ABSOLUTE_ACTIVITY_THRESHOLD) {
-            return new ActivityMetrics(durationSeconds, 0.0, 0.0, 0.0, 0);
+            return new ActivityMetrics(durationSeconds, 0.0, 0.0, 0.0, 0, 0, 0.0);
         }
 
         var activityThreshold = Math.max(ABSOLUTE_ACTIVITY_THRESHOLD, maximumWindowRms * RELATIVE_ACTIVITY_THRESHOLD);
@@ -93,7 +98,7 @@ public final class ActivityAnalyzer {
         }
 
         if (firstActive < 0) {
-            return new ActivityMetrics(durationSeconds, 0.0, 0.0, 0.0, 0);
+            return new ActivityMetrics(durationSeconds, 0.0, 0.0, 0.0, 0, 0, 0.0);
         }
 
         var firstActiveFrame = (long) firstActive * windowFrames;
@@ -106,11 +111,23 @@ public final class ActivityAnalyzer {
 
         var eventGapWindows = Math.max(1, (int) Math.round(EVENT_GAP_SECONDS * sampleRate / windowFrames));
 
-        var eventCount = countEvents(active, firstActive, lastActive, eventGapWindows);
+        var activitySegmentCount = countEvents(active, firstActive, lastActive, eventGapWindows);
 
         var attackSeconds = calculateAttackSeconds(active, firstActive, lastActive, eventGapWindows);
 
-        return new ActivityMetrics(leadingSilenceSeconds, trailingSilenceSeconds, activeDurationSeconds, attackSeconds, eventCount);
+        var onsetCount = countOnsets(active, firstActive, lastActive, activityThreshold);
+
+        var onsetRate = durationSeconds > 0.0 ? onsetCount / durationSeconds : 0.0;
+
+        return new ActivityMetrics(
+                leadingSilenceSeconds,
+                trailingSilenceSeconds,
+                activeDurationSeconds,
+                attackSeconds,
+                activitySegmentCount,
+                onsetCount,
+                onsetRate
+        );
     }
 
 
@@ -174,6 +191,52 @@ public final class ActivityAnalyzer {
     }
 
 
+    private int countOnsets(boolean[] active, int firstActive, int lastActive, double activityThreshold) {
+
+        var lookbackWindows = Math.max(1, (int) Math.round(ONSET_LOOKBACK_SECONDS * sampleRate / windowFrames));
+
+        var minimumIntervalWindows = Math.max(1, (int) Math.round(ONSET_MIN_INTERVAL_SECONDS * sampleRate / windowFrames));
+
+        var onsetCount = 1;
+        var lastOnset = firstActive;
+
+        for (var index = firstActive + 1; index <= lastActive; index++) {
+
+            if (!active[index]) {
+                continue;
+            }
+
+            if (index - lastOnset < minimumIntervalWindows) {
+                continue;
+            }
+
+            var baseline = findOnsetBaseline(index, firstActive, lookbackWindows, activityThreshold);
+
+            if (windowRms.get(index) < baseline * ONSET_RISE_RATIO) {
+                continue;
+            }
+
+            onsetCount++;
+            lastOnset = index;
+        }
+
+        return onsetCount;
+    }
+
+
+    private double findOnsetBaseline(int index, int firstActive, int lookbackWindows, double activityThreshold) {
+
+        var start = Math.max(firstActive, index - lookbackWindows);
+        var baseline = Double.POSITIVE_INFINITY;
+
+        for (var previous = start; previous < index; previous++) {
+            baseline = Math.min(baseline, windowRms.get(previous));
+        }
+
+        return Math.max(activityThreshold, baseline);
+    }
+
+
     private double calculateAttackSeconds(boolean[] active, int firstActive, int lastActive, int eventGapWindows) {
 
         var firstEventEnd = lastActive;
@@ -220,7 +283,7 @@ public final class ActivityAnalyzer {
 
 
     private ActivityMetrics emptyMetrics() {
-        return new ActivityMetrics(0.0, 0.0, 0.0, 0.0, 0);
+        return new ActivityMetrics(0.0, 0.0, 0.0, 0.0, 0, 0, 0.0);
     }
 
 }
