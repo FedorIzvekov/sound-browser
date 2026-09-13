@@ -1,10 +1,11 @@
 package com.fedorizvekov.soundbrowser.model.analysis;
 
 public record MusicFeatures(
-        AmplitudeMetrics amplitudeMetrics,
         ActivityMetrics activityMetrics,
-        Double stereoCorrelation,
+        AmplitudeMetrics amplitudeMetrics,
+        LoopMetrics loopMetrics,
         RhythmMetrics rhythmMetrics,
-        SpectralMetrics spectralMetrics
+        SpectralMetrics spectralMetrics,
+        Double stereoCorrelation
 ) implements AudioFeatures {
 }

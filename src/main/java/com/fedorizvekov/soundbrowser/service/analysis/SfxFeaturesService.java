@@ -63,14 +63,17 @@ public final class SfxFeaturesService {
         var channels = format.getChannels();
         var frameSize = format.getFrameSize();
         var bytesPerSample = format.getSampleSizeInBits() / 8;
+        var sampleRate = format.getSampleRate();
 
-        var amplitudeAnalyzer = new AmplitudeAnalyzer(totalFrames, channels, envelopePoints, format.getSampleRate());
-        var activityAnalyzer = new ActivityAnalyzer(format.getSampleRate());
-        var spectralAnalyzer = new SpectralAnalyzer(format.getSampleRate());
+        var activityAnalyzer = new ActivityAnalyzer(sampleRate);
+        var amplitudeAnalyzer = new AmplitudeAnalyzer(totalFrames, channels, envelopePoints, sampleRate);
+        var loopAnalyzer = new LoopAnalyzer(totalFrames, channels, sampleRate);
+        var spectralAnalyzer = new SpectralAnalyzer(sampleRate);
         var stereoAnalyzer = channels == 2 ? new StereoAnalyzer() : null;
 
         var bufferSize = Math.max(frameSize, BUFFER_SIZE - BUFFER_SIZE % frameSize);
         var buffer = new byte[bufferSize];
+        var frameSamples = new double[channels];
 
         var frameIndex = 0L;
 
@@ -112,6 +115,8 @@ public final class SfxFeaturesService {
                         return Optional.empty();
                     }
 
+                    frameSamples[channel] = sample;
+
                     if (channel == 0) {
                         leftSample = sample;
                     } else if (channel == 1) {
@@ -126,8 +131,9 @@ public final class SfxFeaturesService {
                 var monoSample = frameSampleSum / channels;
                 var frameAmplitude = Math.sqrt(frameSquareSum / channels);
 
-                amplitudeAnalyzer.accept(frameIndex, frameSquareSum, framePeak);
                 activityAnalyzer.accept(frameAmplitude);
+                amplitudeAnalyzer.accept(frameIndex, frameSquareSum, framePeak);
+                loopAnalyzer.accept(frameSamples, frameAmplitude);
                 spectralAnalyzer.accept(monoSample);
 
                 if (stereoAnalyzer != null) {
@@ -142,12 +148,19 @@ public final class SfxFeaturesService {
             return Optional.empty();
         }
 
-        var amplitudeMetrics = amplitudeAnalyzer.finish();
         var activityMetrics = activityAnalyzer.finish();
+        var amplitudeMetrics = amplitudeAnalyzer.finish();
+        var loopMetrics = loopAnalyzer.finish();
         var spectralMetrics = spectralAnalyzer.finish();
         var stereoCorrelation = stereoAnalyzer != null ? stereoAnalyzer.finish() : null;
 
-        return Optional.of(new SfxFeatures(activityMetrics, amplitudeMetrics, stereoCorrelation, spectralMetrics));
+        return Optional.of(new SfxFeatures(
+                activityMetrics,
+                amplitudeMetrics,
+                loopMetrics,
+                spectralMetrics,
+                stereoCorrelation
+        ));
     }
 
 
@@ -231,7 +244,8 @@ public final class SfxFeaturesService {
                 || format.getChannels() <= 0
                 || format.getFrameSize() <= 0
                 || !Float.isFinite(format.getSampleRate())
-                || format.getSampleRate() <= 0.0f) {
+                || format.getSampleRate() <= 0.0f
+        ) {
             return false;
         }
 

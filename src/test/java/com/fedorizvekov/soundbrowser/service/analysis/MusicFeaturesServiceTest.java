@@ -147,6 +147,22 @@ class MusicFeaturesServiceTest {
 
 
     @Test
+    @DisplayName("Should calculate loop features")
+    void shouldCalculateLoopFeatures() {
+
+        var metrics = service.analyze(AUDIO_DIR.resolve("dynamics_steps.wav"))
+                .orElseThrow()
+                .loopMetrics();
+
+        assertAll(
+                () -> assertThat(metrics.amplitudeMismatch()).isGreaterThan(0.8),
+                () -> assertThat(metrics.waveformMismatch()).isBetween(0.0, 1.0),
+                () -> assertThat(metrics.spectralMismatch()).isLessThan(0.05)
+        );
+    }
+
+
+    @Test
     @DisplayName("Should analyze 32-bit floating point PCM")
     void shouldAnalyzeFloatingPointPcm() {
 
