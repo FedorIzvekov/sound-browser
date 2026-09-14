@@ -17,6 +17,12 @@ public final class AmplitudeAnalyzer {
     private final long[] bucketSampleCounts;
     private final float[] peakEnvelope;
 
+    private final long startFrameExclusive;
+    private final long middleFrameExclusive;
+
+    private int currentBucket;
+    private long nextBucketFrame;
+
     private long sampleCount;
     private double squareSum;
     private double peak;
@@ -66,12 +72,18 @@ public final class AmplitudeAnalyzer {
         this.bucketSquareSums = new double[bucketCount];
         this.bucketSampleCounts = new long[bucketCount];
         this.peakEnvelope = new float[bucketCount];
+
+        this.startFrameExclusive = findFractionBoundary(START_FRACTION);
+        this.middleFrameExclusive = findFractionBoundary(END_FRACTION);
+
+        this.currentBucket = 0;
+        this.nextBucketFrame = bucketCount > 1 ? calculateBucketStartFrame(1) : totalFrames;
     }
 
 
     public void accept(long frameIndex, double frameSquareSum, double framePeak) {
 
-        var bucket = (int) (frameIndex * bucketSquareSums.length / totalFrames);
+        updateBucket(frameIndex);
 
         squareSum += frameSquareSum;
         sampleCount += channels;
@@ -81,9 +93,9 @@ public final class AmplitudeAnalyzer {
             peakFrameIndex = frameIndex;
         }
 
-        bucketSquareSums[bucket] += frameSquareSum;
-        bucketSampleCounts[bucket] += channels;
-        peakEnvelope[bucket] = (float) Math.max(peakEnvelope[bucket], framePeak);
+        bucketSquareSums[currentBucket] += frameSquareSum;
+        bucketSampleCounts[currentBucket] += channels;
+        peakEnvelope[currentBucket] = (float) Math.max(peakEnvelope[currentBucket], framePeak);
 
         updateEnvelopeSummary(frameIndex, frameSquareSum);
 
@@ -101,7 +113,7 @@ public final class AmplitudeAnalyzer {
         var rmsEnvelope = createRmsEnvelope();
 
         if (sampleCount == 0) {
-            return new AmplitudeMetrics(0.0, 0.0, 0.0, 0.0, 0.0, 0.0,0.0, 0.0, rmsEnvelope, peakEnvelope);
+            return new AmplitudeMetrics(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, rmsEnvelope, peakEnvelope);
         }
 
         var rms = Math.sqrt(squareSum / sampleCount);
@@ -128,6 +140,50 @@ public final class AmplitudeAnalyzer {
     }
 
 
+    private void updateBucket(long frameIndex) {
+
+        while (frameIndex >= nextBucketFrame && currentBucket < bucketSquareSums.length - 1) {
+
+            currentBucket++;
+
+            nextBucketFrame = currentBucket < bucketSquareSums.length - 1 ? calculateBucketStartFrame(currentBucket + 1) : totalFrames;
+        }
+    }
+
+
+    private long calculateBucketStartFrame(int bucket) {
+
+        var bucketCount = bucketSquareSums.length;
+
+        var quotient = totalFrames / bucketCount;
+        var remainder = totalFrames % bucketCount;
+
+        return (long) bucket * quotient + ((long) bucket * remainder + bucketCount - 1) / bucketCount;
+    }
+
+
+    private long findFractionBoundary(double fraction) {
+
+        var low = 0L;
+        var high = totalFrames;
+
+        while (low < high) {
+
+            var middle = low + (high - low) / 2;
+
+            var position = (middle + 0.5) / totalFrames;
+
+            if (position < fraction) {
+                low = middle + 1;
+            } else {
+                high = middle;
+            }
+        }
+
+        return low;
+    }
+
+
     private float[] createRmsEnvelope() {
 
         var envelope = new float[bucketSquareSums.length];
@@ -145,14 +201,12 @@ public final class AmplitudeAnalyzer {
 
     private void updateEnvelopeSummary(long frameIndex, double frameSquareSum) {
 
-        var position = (frameIndex + 0.5) / totalFrames;
-
-        if (position < START_FRACTION) {
+        if (frameIndex < startFrameExclusive) {
 
             startSquareSum += frameSquareSum;
             startSampleCount += channels;
 
-        } else if (position < END_FRACTION) {
+        } else if (frameIndex < middleFrameExclusive) {
 
             middleSquareSum += frameSquareSum;
             middleSampleCount += channels;
