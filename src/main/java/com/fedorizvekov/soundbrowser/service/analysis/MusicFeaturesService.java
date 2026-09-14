@@ -130,12 +130,12 @@ public final class MusicFeaturesService {
                 }
 
                 var monoSample = frameSampleSum / channels;
-                var frameAmplitude = Math.sqrt(frameSquareSum / channels);
+                var frameMeanSquare = frameSquareSum / channels;
 
-                activityAnalyzer.accept(frameAmplitude);
+                activityAnalyzer.accept(frameMeanSquare);
                 amplitudeAnalyzer.accept(frameIndex, frameSquareSum, framePeak);
-                loopAnalyzer.accept(frameSamples, frameAmplitude);
-                rhythmAnalyzer.accept(frameAmplitude);
+                loopAnalyzer.accept(frameSamples, frameMeanSquare);
+                rhythmAnalyzer.accept(frameMeanSquare);
                 spectralAnalyzer.accept(monoSample);
 
                 if (stereoAnalyzer != null) {
@@ -268,5 +268,4 @@ public final class MusicFeaturesService {
 
         return format.getFrameSize() == expectedFrameSize;
     }
-
 }

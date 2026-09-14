@@ -1,7 +1,7 @@
 package com.fedorizvekov.soundbrowser.service.analysis;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.Arrays;
+
 import com.fedorizvekov.soundbrowser.model.analysis.ActivityMetrics;
 
 public final class ActivityAnalyzer {
@@ -22,9 +22,12 @@ public final class ActivityAnalyzer {
     private static final double ONSET_LOOKBACK_SECONDS = 0.05;
     private static final double ONSET_MIN_INTERVAL_SECONDS = 0.05;
 
+    private static final int INITIAL_WINDOW_CAPACITY = 1024;
     private final double sampleRate;
     private final int windowFrames;
-    private final List<Double> windowRms = new ArrayList<>();
+
+    private double[] windowRms = new double[INITIAL_WINDOW_CAPACITY];
+    private int windowRmsSize;
 
     private long totalFrames;
     private int currentWindowFrames;
@@ -42,9 +45,9 @@ public final class ActivityAnalyzer {
     }
 
 
-    public void accept(double frameAmplitude) {
+    public void accept(double frameMeanSquare) {
 
-        currentWindowSquareSum += frameAmplitude * frameAmplitude;
+        currentWindowSquareSum += frameMeanSquare;
         currentWindowFrames++;
         totalFrames++;
 
@@ -62,14 +65,14 @@ public final class ActivityAnalyzer {
 
         var durationSeconds = totalFrames / sampleRate;
 
-        if (windowRms.isEmpty()) {
+        if (windowRmsSize == 0) {
             return emptyMetrics();
         }
 
         var maximumWindowRms = 0.0;
 
-        for (var rms : windowRms) {
-            maximumWindowRms = Math.max(maximumWindowRms, rms);
+        for (var index = 0; index < windowRmsSize; index++) {
+            maximumWindowRms = Math.max(maximumWindowRms, windowRms[index]);
         }
 
         if (maximumWindowRms <= ABSOLUTE_ACTIVITY_THRESHOLD) {
@@ -78,13 +81,13 @@ public final class ActivityAnalyzer {
 
         var activityThreshold = Math.max(ABSOLUTE_ACTIVITY_THRESHOLD, maximumWindowRms * RELATIVE_ACTIVITY_THRESHOLD);
 
-        var active = new boolean[windowRms.size()];
+        var active = new boolean[windowRmsSize];
         var firstActive = -1;
         var lastActive = -1;
 
-        for (var index = 0; index < windowRms.size(); index++) {
+        for (var index = 0; index < windowRmsSize; index++) {
 
-            active[index] = windowRms.get(index) > activityThreshold;
+            active[index] = windowRms[index] > activityThreshold;
 
             if (!active[index]) {
                 continue;
@@ -131,6 +134,24 @@ public final class ActivityAnalyzer {
     }
 
 
+    private void flushWindow() {
+
+        addWindowRms(Math.sqrt(currentWindowSquareSum / currentWindowFrames));
+        currentWindowSquareSum = 0.0;
+        currentWindowFrames = 0;
+    }
+
+
+    private void addWindowRms(double rms) {
+
+        if (windowRmsSize == windowRms.length) {
+            windowRms = Arrays.copyOf(windowRms, windowRms.length * 2);
+        }
+
+        windowRms[windowRmsSize++] = rms;
+    }
+
+
     private double calculateActiveDurationSeconds(boolean[] active, int firstActive, int lastActive) {
 
         long activeFrames = 0;
@@ -148,15 +169,6 @@ public final class ActivityAnalyzer {
         }
 
         return activeFrames / sampleRate;
-    }
-
-
-    private void flushWindow() {
-
-        windowRms.add(Math.sqrt(currentWindowSquareSum / currentWindowFrames));
-
-        currentWindowSquareSum = 0.0;
-        currentWindowFrames = 0;
     }
 
 
@@ -212,7 +224,7 @@ public final class ActivityAnalyzer {
 
             var baseline = findOnsetBaseline(index, firstActive, lookbackWindows, activityThreshold);
 
-            if (windowRms.get(index) < baseline * ONSET_RISE_RATIO) {
+            if (windowRms[index] < baseline * ONSET_RISE_RATIO) {
                 continue;
             }
 
@@ -230,7 +242,7 @@ public final class ActivityAnalyzer {
         var baseline = Double.POSITIVE_INFINITY;
 
         for (var previous = start; previous < index; previous++) {
-            baseline = Math.min(baseline, windowRms.get(previous));
+            baseline = Math.min(baseline, windowRms[previous]);
         }
 
         return Math.max(activityThreshold, baseline);
@@ -262,7 +274,7 @@ public final class ActivityAnalyzer {
         var eventPeakRms = 0.0;
 
         for (var index = firstActive; index <= firstEventEnd; index++) {
-            eventPeakRms = Math.max(eventPeakRms, windowRms.get(index));
+            eventPeakRms = Math.max(eventPeakRms, windowRms[index]);
         }
 
         if (eventPeakRms <= 0.0) {
@@ -273,7 +285,7 @@ public final class ActivityAnalyzer {
 
         for (var index = firstActive; index <= firstEventEnd; index++) {
 
-            if (windowRms.get(index) >= attackLevel) {
+            if (windowRms[index] >= attackLevel) {
                 return (index - firstActive) * windowFrames / sampleRate;
             }
         }

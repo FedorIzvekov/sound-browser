@@ -80,10 +80,9 @@ public final class MusicRhythmAnalyzer {
     }
 
 
-    public void accept(double frameAmplitude) {
+    public void accept(double frameMeanSquare) {
 
-        currentWindowSquareSum += frameAmplitude * frameAmplitude;
-
+        currentWindowSquareSum += frameMeanSquare;
         currentWindowFrames++;
         totalFrames++;
 

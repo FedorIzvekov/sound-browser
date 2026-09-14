@@ -148,7 +148,7 @@ class MusicRhythmAnalyzerTest {
         addTransient(samples, 700, 0.9);
 
         for (var sample : samples) {
-            analyzer.accept(sample);
+            analyzer.accept(sample * sample);
         }
 
         assertThat(analyzer.finish().tempoBpm()).isCloseTo(120.0, within(2.0));
@@ -290,7 +290,7 @@ class MusicRhythmAnalyzerTest {
 
         for (var frame = 0; frame < frames; frame++) {
 
-            analyzer.accept(amplitude);
+            analyzer.accept(amplitude * amplitude);
         }
     }
 

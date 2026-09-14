@@ -27,7 +27,7 @@ class LoopAnalyzerTest {
 
             var sample = Math.sin(2.0 * Math.PI * 20.0 * frame / SAMPLE_RATE);
 
-            analyzer.accept(new double[]{sample}, Math.abs(sample));
+            analyzer.accept(new double[]{sample}, sample * sample);
         }
 
         var metrics = analyzer.finish();
@@ -48,9 +48,9 @@ class LoopAnalyzerTest {
 
         for (var frame = 0; frame < TOTAL_FRAMES; frame++) {
 
-            var amplitude = frame < 50 ? 1.0 : frame >= 950 ? 0.5 : 0.75;
+            var sample = frame < 50 ? 1.0 : frame >= 950 ? 0.5 : 0.75;
 
-            analyzer.accept(new double[]{amplitude}, amplitude);
+            analyzer.accept(new double[]{sample}, sample * sample);
         }
 
         var metrics = analyzer.finish();
@@ -69,7 +69,7 @@ class LoopAnalyzerTest {
 
             var sample = frame >= 995 ? -0.5 : 0.5;
 
-            analyzer.accept(new double[]{sample}, 0.5);
+            analyzer.accept(new double[]{sample}, sample * sample);
         }
 
         var metrics = analyzer.finish();
@@ -90,9 +90,9 @@ class LoopAnalyzerTest {
 
             var right = frame >= 995 ? -0.5 : 0.5;
 
-            var frameAmplitude = Math.sqrt((left * left + right * right) / 2.0);
+            var sample = (left * left + right * right) / 2.0;
 
-            analyzer.accept(new double[]{left, right}, frameAmplitude);
+            analyzer.accept(new double[]{left, right}, sample);
         }
 
         var metrics = analyzer.finish();
@@ -111,7 +111,7 @@ class LoopAnalyzerTest {
 
             var sample = 0.00001 * Math.sin(2.0 * Math.PI * 20.0 * frame / SAMPLE_RATE);
 
-            analyzer.accept(new double[]{sample}, Math.abs(sample));
+            analyzer.accept(new double[]{sample}, sample * sample);
         }
 
         var metrics = analyzer.finish();
@@ -132,7 +132,7 @@ class LoopAnalyzerTest {
 
             var sample = Math.sin(2.0 * Math.PI * frequency * frame / SAMPLE_RATE);
 
-            analyzer.accept(new double[]{sample}, Math.abs(sample));
+            analyzer.accept(new double[]{sample}, sample * sample);
         }
 
         var metrics = analyzer.finish();
@@ -151,7 +151,7 @@ class LoopAnalyzerTest {
 
             var sample = Math.sin(2.0 * Math.PI * 50.0 * frame / SAMPLE_RATE);
 
-            analyzer.accept(new double[]{sample}, Math.abs(sample));
+            analyzer.accept(new double[]{sample}, sample * sample);
         }
 
         var metrics = analyzer.finish();
@@ -204,7 +204,7 @@ class LoopAnalyzerTest {
 
             var sample = Math.sin(2.0 * Math.PI * 20.0 * frame / SAMPLE_RATE);
 
-            analyzer.accept(new double[]{sample}, Math.abs(sample));
+            analyzer.accept(new double[]{sample}, sample * sample);
         }
 
         var first = analyzer.finish();
@@ -220,7 +220,7 @@ class LoopAnalyzerTest {
 
         var analyzer = new LoopAnalyzer(TOTAL_FRAMES, 2, SAMPLE_RATE);
 
-        assertThatThrownBy(() -> analyzer.accept(new double[]{0.5}, 0.5))
+        assertThatThrownBy(() -> analyzer.accept(new double[]{0.5}, 0.25))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Channel sample count does not match configured channels");
     }

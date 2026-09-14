@@ -82,16 +82,14 @@ public final class LoopAnalyzer {
     }
 
 
-    public void accept(double[] channelSamples, double frameAmplitude) {
+    public void accept(double[] channelSamples, double frameMeanSquare) {
 
         if (channelSamples.length != channels) {
             throw new IllegalArgumentException("Channel sample count does not match configured channels");
         }
 
-        var amplitudeSquare = frameAmplitude * frameAmplitude;
-
         acceptedFrames++;
-        globalAmplitudeSquareSum += amplitudeSquare;
+        globalAmplitudeSquareSum += frameMeanSquare;
 
         for (var channel = 0; channel < channels; channel++) {
 
@@ -101,7 +99,7 @@ public final class LoopAnalyzer {
         }
 
         acceptWaveformSamples(channelSamples);
-        acceptAmplitude(amplitudeSquare);
+        acceptAmplitude(frameMeanSquare);
         acceptSpectralSamples(channelSamples);
     }
 

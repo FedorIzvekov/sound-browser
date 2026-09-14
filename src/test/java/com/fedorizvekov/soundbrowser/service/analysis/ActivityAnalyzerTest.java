@@ -84,6 +84,20 @@ class ActivityAnalyzerTest {
 
 
     @Test
+    @DisplayName("Should interpret accepted value as frame mean square")
+    void shouldInterpretAcceptedValueAsFrameMeanSquare() {
+
+        for (var frame = 0; frame < 100; frame++) {
+            analyzer.accept(0.25);
+        }
+
+        var metrics = analyzer.finish();
+
+        assertThat(metrics.activeDurationSeconds()).isCloseTo(0.1, within(0.000001));
+    }
+
+
+    @Test
     @DisplayName("Should count multiple onsets inside one activity segment")
     void shouldCountMultipleOnsetsInsideOneActivitySegment() {
 
@@ -229,7 +243,7 @@ class ActivityAnalyzerTest {
     private void accept(ActivityAnalyzer analyzer, double amplitude, int frames) {
 
         for (var frame = 0; frame < frames; frame++) {
-            analyzer.accept(amplitude);
+            analyzer.accept(amplitude * amplitude);
         }
     }
 
