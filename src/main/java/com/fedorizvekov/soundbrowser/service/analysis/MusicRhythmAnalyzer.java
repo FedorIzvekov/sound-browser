@@ -1,8 +1,6 @@
 package com.fedorizvekov.soundbrowser.service.analysis;
 
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.List;
 
 import com.fedorizvekov.soundbrowser.model.analysis.RhythmMetrics;
 import com.fedorizvekov.soundbrowser.model.analysis.TempoStability;
@@ -44,6 +42,9 @@ public final class MusicRhythmAnalyzer {
 
     private static final int ONSET_SMOOTHING_WINDOWS = 3;
 
+    private static final int INITIAL_WINDOW_CAPACITY = 1024;
+    private static final int INITIAL_STABILITY_CAPACITY = 8;
+
     private static final int RHYTHM_WINDOW_COUNT = Math.max(1, (int) Math.round(RHYTHM_WINDOW_SECONDS / WINDOW_SECONDS));
 
     private static final int ONSET_THRESHOLD_RADIUS = Math.max(1, (int) Math.round(ONSET_THRESHOLD_WINDOW_SECONDS / RHYTHM_WINDOW_SECONDS / 2.0));
@@ -56,7 +57,12 @@ public final class MusicRhythmAnalyzer {
 
     private final double sampleRate;
     private final int windowFrames;
-    private final List<Double> windowRms = new ArrayList<>();
+
+    private double[] windowRms = new double[INITIAL_WINDOW_CAPACITY];
+
+    private int windowRmsSize;
+
+    private double[] stabilityCorrelations = new double[INITIAL_STABILITY_CAPACITY];
 
     private long totalFrames;
     private int currentWindowFrames;
@@ -93,7 +99,7 @@ public final class MusicRhythmAnalyzer {
             flushWindow();
         }
 
-        if (windowRms.isEmpty() || totalFrames == 0) {
+        if (windowRmsSize == 0 || totalFrames == 0) {
             return new RhythmMetrics(0.0, 0.0, 0.0);
         }
 
@@ -114,17 +120,26 @@ public final class MusicRhythmAnalyzer {
 
     private void flushWindow() {
 
-        windowRms.add(Math.sqrt(currentWindowSquareSum / currentWindowFrames));
+        addWindowRms(Math.sqrt(currentWindowSquareSum / currentWindowFrames));
 
         currentWindowSquareSum = 0.0;
         currentWindowFrames = 0;
     }
 
 
+    private void addWindowRms(double rms) {
+
+        if (windowRmsSize == windowRms.length) {
+            windowRms = Arrays.copyOf(windowRms, windowRms.length * 2);
+        }
+
+        windowRms[windowRmsSize++] = rms;
+    }
+
+
     private double calculateMeanRms() {
 
-        return windowRms.stream()
-                .mapToDouble(Double::doubleValue)
+        return Arrays.stream(windowRms, 0, windowRmsSize)
                 .average()
                 .orElse(0.0);
     }
@@ -138,13 +153,13 @@ public final class MusicRhythmAnalyzer {
 
         var variance = 0.0;
 
-        for (var value : windowRms) {
+        for (var index = 0; index < windowRmsSize; index++) {
 
-            var difference = value - meanRms;
+            var difference = windowRms[index] - meanRms;
             variance += difference * difference;
         }
 
-        variance /= windowRms.size();
+        variance /= windowRmsSize;
 
         return Math.sqrt(variance) / meanRms;
     }
@@ -173,21 +188,21 @@ public final class MusicRhythmAnalyzer {
 
     private double[] createSmoothedRms() {
 
-        var result = new double[windowRms.size()];
+        var result = new double[windowRmsSize];
 
         var radius = ONSET_SMOOTHING_WINDOWS / 2;
 
-        for (var index = 0; index < windowRms.size(); index++) {
+        for (var index = 0; index < windowRmsSize; index++) {
 
             var from = Math.max(0, index - radius);
 
-            var to = Math.min(windowRms.size(), index + radius + 1);
+            var to = Math.min(windowRmsSize, index + radius + 1);
 
             var squareSum = 0.0;
 
             for (var sample = from; sample < to; sample++) {
 
-                var rms = windowRms.get(sample);
+                var rms = windowRms[sample];
 
                 squareSum += rms * rms;
             }
@@ -227,7 +242,7 @@ public final class MusicRhythmAnalyzer {
 
     private double[] detectOnsets(double[] rhythmOnsetEnvelope, double[] fineOnsetEnvelope, double meanRms) {
 
-        var detectedOnsets = new double[windowRms.size()];
+        var detectedOnsets = new double[windowRmsSize];
 
         var minimumStrength = meanRms * MIN_ONSET_STRENGTH_RATIO;
 
@@ -380,9 +395,14 @@ public final class MusicRhythmAnalyzer {
 
             scores[lag] = score;
 
-            var stability = calculateTempoStability(detectedOnsets, tempoEnvelope, lag);
+            var accepted = correlation >= MIN_TEMPO_CORRELATION;
 
-            var accepted = correlation >= MIN_TEMPO_CORRELATION || isStableTempoCandidate(correlation, stability);
+            if (!accepted && correlation >= MIN_STABLE_TEMPO_CORRELATION) {
+
+                var stability = calculateTempoStability(detectedOnsets, tempoEnvelope, lag);
+
+                accepted = isStableTempoCandidate(correlation, stability);
+            }
 
             if (!accepted) {
                 continue;
@@ -467,7 +487,7 @@ public final class MusicRhythmAnalyzer {
 
     private TempoStability calculateTempoStability(double[] detectedOnsets, double[] tempoEnvelope, int lag) {
 
-        var segmentCorrelations = new ArrayList<Double>();
+        var correlationCount = 0;
 
         for (var from = 0; from < tempoEnvelope.length; from += TEMPO_STABILITY_SEGMENT_WINDOWS) {
 
@@ -481,34 +501,40 @@ public final class MusicRhythmAnalyzer {
                 continue;
             }
 
-            var correlation = calculateCorrelation(tempoEnvelope, from, to, lag);
+            ensureStabilityCapacity(correlationCount + 1);
 
-            segmentCorrelations.add(correlation);
+            stabilityCorrelations[correlationCount++] = calculateCorrelation(tempoEnvelope, from, to, lag);
         }
 
-        return calculateTempoStability(segmentCorrelations);
-    }
-
-
-    private TempoStability calculateTempoStability(List<Double> segmentCorrelations) {
-
-        if (segmentCorrelations.isEmpty()) {
+        if (correlationCount == 0) {
             return TempoStability.EMPTY;
         }
 
-        var mean = segmentCorrelations.stream().mapToDouble(Double::doubleValue).average().orElse(0.0);
+        var mean = Arrays.stream(stabilityCorrelations, 0, correlationCount).average().orElse(0.0);
 
         var variance = 0.0;
 
-        for (var correlation : segmentCorrelations) {
+        for (var index = 0; index < correlationCount; index++) {
 
-            var difference = correlation - mean;
+            var difference = stabilityCorrelations[index] - mean;
             variance += difference * difference;
         }
 
-        variance /= segmentCorrelations.size();
+        variance /= correlationCount;
 
-        return new TempoStability(mean, Math.sqrt(variance), segmentCorrelations.size());
+        return new TempoStability(mean, Math.sqrt(variance), correlationCount);
+    }
+
+
+    private void ensureStabilityCapacity(int requiredCapacity) {
+
+        if (requiredCapacity <= stabilityCorrelations.length) {
+            return;
+        }
+
+        var newCapacity = Math.max(requiredCapacity, stabilityCorrelations.length * 2);
+
+        stabilityCorrelations = Arrays.copyOf(stabilityCorrelations, newCapacity);
     }
 
 
